@@ -425,6 +425,8 @@ void display_main_properties() {
 	ImGui::InputScalar("BPM", ImGuiDataType_S32, &root.bpm);
 	ChooseFuserEnum<FuserEnums::Key>("Key", root.songKey);
 	ChooseFuserEnum<FuserEnums::KeyMode>("Mode", root.keyMode);
+	ChooseFuserEnum<FuserEnums::Genre>("Genre", root.genre);
+	ImGui::InputScalar("Year", ImGuiDataType_S32, &root.year);
 }
 
 std::string lastMoggError;
