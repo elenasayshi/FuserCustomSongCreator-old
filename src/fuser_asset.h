@@ -46,7 +46,6 @@ struct FuserEnums {
 
 		static const std::vector<std::string>& GetValues() {
 			static std::vector<std::string> values = {
-				"EGenre::None",
 				"EGenre::Classical",
 				"EGenre::Country",
 				"EGenre::Rock",
@@ -100,29 +99,12 @@ struct FuserEnums {
 			static std::vector<std::string> values = {
 				"EInstrument::None",
 				"EInstrument::Guitar",
-				"EInstrument::Bass",
 				"EInstrument::Drums",
 				"EInstrument::Vocal",
 				"EInstrument::Synth",
 				"EInstrument::Sampler",
 				"EInstrument::Horns",
-				"EInstrument::Strings",
-				"EInstrument::FemaleVocals",
-				"EInstrument::MaleVocals",
-				"EInstrument::BassGuitar",
-				"EInstrument::AcousticGuitar",
-				"EInstrument::ElectricGuitar",
-				"EInstrument::AcousticDrums",
-				"EInstrument::ElectricDrums",
-				"EInstrument::SteelDrums",
-				"EInstrument::Piano",
-				"EInstrument::Organ",
-				"EInstrument::Saxophone",
-				"EInstrument::Trumpet",
-				"EInstrument::Didgeridoo",
-				"EInstrument::Fiddle",
-				"EInstrument::Violin",
-				"EInstrument::Dogs"
+				"EInstrument::Strings"
 			};
 			return values;
 		}
