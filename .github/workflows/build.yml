@@ -10,10 +10,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Configure CMake
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64_x86
+      - name: Configure CMake  
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build --config Release
