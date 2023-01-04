@@ -4,14 +4,14 @@ on:
       - "*"
 
 # This workflow will build a CMake based project using CMake on Windows platform and publish it to Github when a release is created
-# This workflow will build on x86_64 platform
+# This workflow will build on x86 platform
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=x86_64
+        run: cmake -B build -DCMAKE_BUILD_TYPE=x86
       - name: Build
         run: cmake --build build --config Release
       - name: Create Release
