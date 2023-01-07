@@ -515,8 +515,8 @@ void display_cell_data(CelData &celData, FuserEnums::KeyMode::Value currentKeyMo
 
 	ImGui::NewLine();
 	
-	std::string primaryKey = "Major";
-	std::string secondaryKey = "Minor";
+	std::string primaryKey = "";
+	std::string secondaryKey = "";
 
 	if (currentKeyMode == FuserEnums::KeyMode::Value::Minor) {
 		std::swap(primaryKey, secondaryKey);
