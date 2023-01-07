@@ -9,7 +9,7 @@ A small UI to create custom songs for Fuser! Requires [Fuser Song Loader](https:
 ## Building
 
 ```bash
-git clone https://github.com/Kapilarny/FuserCustomSongCreator.git
+git clone https://github.com/elenasayshi/FuserCustomSongCreator.git
 cd FuserCustomSongCreator
 ./build.bat
 ```
