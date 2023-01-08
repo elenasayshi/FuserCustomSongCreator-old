@@ -515,12 +515,19 @@ void display_cell_data(CelData &celData, FuserEnums::KeyMode::Value currentKeyMo
 
 	ImGui::NewLine();
 	
+	std::string primaryKey = "";
+	std::string secondaryKey = "";
+
+	if (currentKeyMode == FuserEnums::KeyMode::Value::Minor) {
+		std::swap(primaryKey, secondaryKey);
+	}
+
 	std::string duplacateString = "Duplicate Primary audio for Secondary audio?";
 
 	auto windowSize = ImGui::GetWindowSize();
 	auto oggWindowSize = 150;
 	ImGui::BeginChild("Primary", ImVec2(windowSize.x / 2, oggWindowSize));
-	ImGui::Text(("Primary").c_str());
+	ImGui::Text(("Primary (" + primaryKey + ")").c_str());
 	display_mogg_settings(fusionFile, 0, *moggFiles[0]);
 
 	bool duplicate_changed = false;
@@ -589,7 +596,7 @@ void display_cell_data(CelData &celData, FuserEnums::KeyMode::Value currentKeyMo
 
 	ImGui::SameLine();
 	ImGui::BeginChild("Secondary", ImVec2(windowSize.x / 2, oggWindowSize));
-	ImGui::Text(("Secondary").c_str());
+	ImGui::Text(("Secondary (" + secondaryKey + ")").c_str());
 
 	if (duplicate_moggs) {
 		ImGui::Text("Audio is duplicated from the primary audio.");
