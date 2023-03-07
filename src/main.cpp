@@ -39,6 +39,7 @@ size_t window_height = 800;
 
 //extern void window_loop();
 extern void custom_song_creator_update(size_t width, size_t height);
+extern void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice);
 extern void initAudio();
 HWND G_hwnd;
 
@@ -64,14 +65,16 @@ int __stdcall WinMain(
 	freopen_s(&fp, "CONOUT$", "w", stdout);
 	freopen_s(&fp, "CONOUT$", "w", stderr);
 #endif
-
+    HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(102));
+   
     // Create application window
     //ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T("Fuser Custom Song Creator"), NULL };
     ::RegisterClassEx(&wc);
     HWND hwnd = ::CreateWindow(wc.lpszClassName, _T("Fuser Custom Song Creator"), WS_OVERLAPPEDWINDOW, 100, 100, window_width, window_height, NULL, NULL, wc.hInstance, NULL);
 	G_hwnd = hwnd;
-
+    SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+    SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
 	initAudio();
 
 	
@@ -124,6 +127,7 @@ int __stdcall WinMain(
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
+    
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
     while (msg.message != WM_QUIT)
@@ -148,6 +152,7 @@ int __stdcall WinMain(
 		//ImGui::ShowDemoWindow();
 
 		//window_loop();
+        set_g_pd3dDevice(g_pd3dDevice);
 		custom_song_creator_update(window_width, window_height);
 
         // Rendering
