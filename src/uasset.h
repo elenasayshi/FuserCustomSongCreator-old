@@ -3,6 +3,8 @@
 #include "sha1.h"
 #include "crc.h"
 #include "hmx_midifile.h"
+#include <codecvt>
+#include <iostream>
 
 struct AssetHeader;
 

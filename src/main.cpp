@@ -58,7 +58,7 @@ int __stdcall WinMain(
 		AllocConsole();
 		ShowWindow(GetConsoleWindow(), SW_SHOW);
 	}
-
+    
 	//Redirect output to console
 	FILE* fp;
 	freopen_s(&fp, "CONOIN$", "r", stdin);

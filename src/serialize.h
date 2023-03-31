@@ -4,6 +4,8 @@
 #include <type_traits>
 #include <functional>
 #include <optional>
+#include <codecvt>
+#include <iostream>
 
 template<class ...Ts>
 struct voider {
@@ -13,7 +15,7 @@ struct voider {
 struct DataBuffer {
 	bool loading = true;
 	size_t pos = 0;
-	size_t size = 0;
+	i32 size = 0;
 	u8* buffer = nullptr;
 	void *ctx_;
 	std::function<void(size_t)> resize;
@@ -21,7 +23,7 @@ struct DataBuffer {
 	bool watch_ = false;
 	struct WatchedValue {
 		u8 *data;
-		size_t size;
+		i32 size;
 		size_t buffer_pos;
 	};
 	std::vector<WatchedValue> watchedValues;
@@ -95,14 +97,16 @@ struct DataBuffer {
 	}
 
 
-	void serialize(u8 *data, size_t data_size) {
+	void serialize(u8 *data, i32 data_size) {
 		if (derivedBuffer.has_value()) {
 			size_t prevPos = derivedBuffer->base->pos;
 			bool prevWatch = derivedBuffer->base->watch_;
 			
 			derivedBuffer->base->pos = pos + derivedBuffer->offset;
 			derivedBuffer->base->watch_ = watch_;
-			
+			if (data_size < 0) {
+				data_size = data_size * -2;
+			}
 			derivedBuffer->base->serialize(data, data_size);
 
 			derivedBuffer->base->watch_ = prevWatch;
@@ -186,50 +190,61 @@ struct DataBuffer {
 		}
 	}
 
-	template<typename T, size_t N>
+	template<typename T, i32 N>
 	void serialize(T (&data)[N]) {
-		for (size_t i = 0; i < N; ++i) {
+		for (i32 i = 0; i < N; ++i) {
 			serialize(data[i]);
 		}
 	}
 
 	template<typename T>
 	void serialize(std::vector<T>& data) {
-		u32 size = data.size();
+		i32 size = data.size();
 		serialize(size);
 
 		if (loading) {
 			data.resize(size);
 		}
 
-		for (u32 i = 0; i < size; ++i) {
+		for (i32 i = 0; i < size; ++i) {
 			serialize(data[i]);
 		}
 	}
 
 	template<typename T>
-	void serializeWithSize(std::vector<T>& data, size_t size) {
+	void serializeWithSize(std::vector<T>& data, i32 size) {
 		if (loading) {
 			data.resize(size);
 		}
 
-		for (u32 i = 0; i < size; ++i) {
+		for (i32 i = 0; i < size; ++i) {
 			serialize(data[i]);
 		}
 	}
 
 	void serialize(std::string& data) {
-		
-
 		if (loading) {
-			u32 size = data.size();
-			serialize(size);
-
-			if (size != 0) {
-				data.resize(size - 1);
-				serialize((u8*)data.data(), size - 1);
-				pos += 1;
+			i32 size = (i32)data.size();
+			i32 origSize = size;
+			if (size < 0) {
+				size = size * -2;
+				data.resize(size-2);
 			}
+			serialize(size);
+			if(size!=0){
+				if (origSize < 0) {
+					serialize((u8*)data.data(), size - 2);
+					std::cout << data;
+					pos += 1;
+				}
+				else {
+					data.resize(size-1);
+					serialize((u8*)data.data(), size - 1);
+					pos += 1;
+				}
+				
+			}
+
 		}
 		else {
 			if (data.size() == 0) {
@@ -237,9 +252,35 @@ struct DataBuffer {
 				serialize(null);
 			}
 			else {
-				u32 size = data.size() + 1;
-				serialize(size);
-				serialize((u8*)data.data(), size);
+				i32 size = data.size() + 1;
+				bool isUtf16 = false;
+				for (char c : data) {
+					if (c & 0x80) {
+						isUtf16 = true;
+					}
+				}
+				if (isUtf16) {
+					std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
+					
+					std::u16string utf16_str = converter.from_bytes(data);
+
+					// Convert the UTF-16 string to an array of bytes
+					std::vector<uint8_t> utf16_bytes(reinterpret_cast<const uint8_t*>(utf16_str.data()), reinterpret_cast<const uint8_t*>(utf16_str.data() + utf16_str.size()));
+					utf16_bytes.push_back(0);
+					utf16_bytes.push_back(0);
+					for (u8 c : utf16_bytes) {
+						std::cout << std::to_string((char)c)+" ";
+					}
+					i32 newsize = 0 - (utf16_str.size())-1;
+					serialize(newsize);
+					std::cout << " " + std::to_string(newsize) + "\n";
+					serialize(utf16_bytes.data(), (size * 2));
+				}
+				else {
+					serialize(size);
+					serialize((u8*)data.data(), size);
+				}
+				
 			}
 		}
 	}

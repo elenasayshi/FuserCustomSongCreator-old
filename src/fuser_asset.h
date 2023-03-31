@@ -335,7 +335,7 @@ struct SongSerializationCtx {
 
 	void serializeName(const std::string &propName, std::string &serializedStr) {
 		auto &&prop = *getProp<NameProperty>(curEntry, propName);
-		if (loading) {
+		if (loading) { 
 			serializedStr = prop.name.getString(getHeader());
 		}
 		else {
