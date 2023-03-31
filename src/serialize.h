@@ -225,20 +225,23 @@ struct DataBuffer {
 	void serialize(std::string& data) {
 		if (loading) {
 			i32 size = (i32)data.size();
-			i32 origSize = size;
-			if (size < 0) {
-				size = size * -2;
-				data.resize(size-2);
-			}
+			i32 origSize = (i32)data.size();
 			serialize(size);
 			if(size!=0){
-				if (origSize < 0) {
-					serialize((u8*)data.data(), size - 2);
-					std::cout << data;
-					pos += 1;
+				if (size < 0) {
+					std::cout << size;
+					size = size * -2;
+					data.resize(size-2);
+					serialize((u8*)data.data(), size-2);
+					std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+					data = converter.to_bytes(
+						std::wstring(reinterpret_cast<const wchar_t*>(data.data()),
+							data.length() / sizeof(wchar_t)));
+	
+					pos += 2;
 				}
 				else {
-					data.resize(size-1);
+					data.resize(size - 1);
 					serialize((u8*)data.data(), size - 1);
 					pos += 1;
 				}
@@ -263,17 +266,13 @@ struct DataBuffer {
 					std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
 					
 					std::u16string utf16_str = converter.from_bytes(data);
-
-					// Convert the UTF-16 string to an array of bytes
 					std::vector<uint8_t> utf16_bytes(reinterpret_cast<const uint8_t*>(utf16_str.data()), reinterpret_cast<const uint8_t*>(utf16_str.data() + utf16_str.size()));
 					utf16_bytes.push_back(0);
 					utf16_bytes.push_back(0);
-					for (u8 c : utf16_bytes) {
-						std::cout << std::to_string((char)c)+" ";
-					}
-					i32 newsize = 0 - (utf16_str.size())-1;
+
+					size = utf16_str.size() + 1;
+					i32 newsize = 0 - size;
 					serialize(newsize);
-					std::cout << " " + std::to_string(newsize) + "\n";
 					serialize(utf16_bytes.data(), (size * 2));
 				}
 				else {

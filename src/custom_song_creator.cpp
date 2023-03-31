@@ -312,6 +312,8 @@ struct MainContext {
 };
 MainContext gCtx;
 
+bool funny = true;
+
 void load_file(DataBuffer&& dataBuf) {
 	gCtx.has_art = false;
 	gCtx.currentPak.reset();
@@ -380,7 +382,7 @@ void load_file(DataBuffer&& dataBuf) {
 		__debugbreak();
 	}
 
-
+	
 	if (gCtx.has_art) {
 		SongSerializationCtx ctx;
 		ctx.loading = true;
@@ -492,7 +494,7 @@ void load_file(DataBuffer&& dataBuf) {
 		}
 
 	}
-
+	
 }
 
 void load_template() {

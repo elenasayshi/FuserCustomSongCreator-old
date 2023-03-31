@@ -65,7 +65,7 @@ int __stdcall WinMain(
 	freopen_s(&fp, "CONOUT$", "w", stdout);
 	freopen_s(&fp, "CONOUT$", "w", stderr);
 #endif
-    HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(102));
+    HICON hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(101));
    
     // Create application window
     //ImGui_ImplWin32_EnableDpiAwareness();
