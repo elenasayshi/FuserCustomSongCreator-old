@@ -649,7 +649,8 @@ void update_texture(std::string filepath, AssetLink<IconFileAsset> icon) {
 void display_album_art() {
 	auto&& root = gCtx.currentPak->root;
 
-	ImGui::Text("Album art resizes to 512x512px for small and 1080x1080px for large. Accepted formats: bmp,png,jpg,jpeg");
+	ImGui::Text("Album art resizes to 512x512px for small and 1080x1080px for large");
+	ImGui::Text("Accepted formats: bmp,png,jpg,jpeg");
 	if (ImGui::Button("Import Album Art")) {
 		auto file = OpenFile("Image File\0*.bmp;*.png;*.jpg;*.jpeg\0");
 		if (file) {
@@ -978,11 +979,9 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 
 	if (ImGui::BeginPopupModal("Switch Modes?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::BeginChild("PopupHolder", ImVec2(420, 100));
+		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
 		if (advanced) {
-
-			ImGui::BeginChild("Text", ImVec2(420, 69));
-			ImGui::Text(celShortName.c_str());
+			ImGui::BeginChild("Text", ImVec2(420, 85));
 			ImGui::Text("Are you sure you want to switch to Simple Mode?");
 			ImGui::TextWrapped("WARNING: This will reset audio file and keymap count, as well as the keymap midi, velocity, and offset settings.");
 			ImGui::EndChild();
@@ -1080,7 +1079,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 			ImGui::EndChild();
 		}
 		else {
-			ImGui::BeginChild("Text", ImVec2(420, 69));
+			ImGui::BeginChild("Text", ImVec2(420, 85));
 			ImGui::Text("Switch to Advanced Mode?");
 			ImGui::EndChild();
 			ImGui::BeginChild("Buttons", ImVec2(420, 25));
@@ -1212,7 +1211,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 
 		ImGui::EndChild();
 
-		ImGui::BeginChild("Keymap", ImVec2(aRegion.x, (aRegion.y / 2)+70));
+		ImGui::BeginChild("Keymap", ImVec2(aRegion.x, ImGui::GetContentRegionAvail().y - 32));
 
 
 
@@ -1258,14 +1257,14 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 		ImGui::EndChild();
 		ImGui::SameLine();
 
-		ImGui::BeginChild("KeymapSettings", ImVec2((aRegion.x / 3) * 2, (aRegion.y / 2)+60));
+		ImGui::BeginChild("KeymapSettings", ImVec2((aRegion.x / 3) * 2, ImGui::GetContentRegionAvail().y));
 		display_keyzone_settings(std::get<hmx_fusion_nodes*>(map.children[currentKeyzone].value), moggFiles);
 		ImGui::EndChild();
 
 		ImGui::EndChild();
 	}
 	else {
-		ImGui::BeginChild("SimpleUI", ImVec2((aRegion.x / 3) * 2, (aRegion.y / 3) + (aRegion.y / 2) + 74));
+		ImGui::BeginChild("SimpleUI", ImVec2((aRegion.x / 3) * 2, ImGui::GetContentRegionAvail().y - 32));
 		bool duplicate_changed = false;
 		if (duplicate_moggs) {
 			ImGui::Text("Duplicated");
@@ -1594,15 +1593,15 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 
 	auto windowSize = ImGui::GetWindowSize();
 
-	auto oggWindowSize = ImGui::GetContentRegionAvail().y - 50;
+	auto oggWindowSize = ImGui::GetContentRegionAvail().y - 70;
 	if (ImGui::BeginTabBar("CelDataEditTabs")) {
 		if (ImGui::BeginTabItem("Disc Audio")) {
-			ImGui::BeginChild("AudioSettingsDisc", ImVec2((windowSize.x / 3) * 2, oggWindowSize));
+			ImGui::BeginChild("AudioSettingsDisc", ImVec2((windowSize.x / 3) * 2, oggWindowSize), true);
 			display_cel_audio_options(celData, asset, moggFiles, fusionFile, fusionPackageFile, duplicate_moggs, false);
 			ImGui::EndChild();
 			ImGui::SameLine();
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
-			ImGui::BeginChild("Advanced - Disc", ImVec2(windowSize.x / 3, oggWindowSize));
+			ImGui::BeginChild("Advanced - Disc", ImVec2(ImGui::GetContentRegionAvail().x, oggWindowSize), true);
 			if (ImGui::Button("Export Disc Fusion File")) {
 				auto file = SaveFile("Fusion Text File (.fusion)\0*.fusion\0", "fusion", "");
 				if (file) {
@@ -1702,8 +1701,8 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			}
 
 			auto pickupTableSize = ImGui::GetContentRegionAvail().y;
-			ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 150));
-			if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3)-15, ImGui::GetContentRegionAvail().y - 150))) {
+			ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170));
+			if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3)-15, ImGui::GetContentRegionAvail().y - 170))) {
 				ImGui::TableSetupColumn("Index", 0, 0.2);
 				ImGui::TableSetupColumn("Pickup Beat");
 				ImGui::TableHeadersRow();
@@ -1850,12 +1849,12 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			ImGui::EndTabItem();
 		}
 		if (ImGui::BeginTabItem("Riser Audio")) {
-			ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize));
+			ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize),true);
 			display_cel_audio_options(celData, assetRiser, moggFilesRiser, fusionFileRiser, fusionPackageFileRiser, duplicate_moggsRiser, true);
 			ImGui::EndChild();
 			ImGui::SameLine();
 			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
-			ImGui::BeginChild("Advanced - Riser", ImVec2(windowSize.x / 3, oggWindowSize));
+			ImGui::BeginChild("Advanced - Riser", ImVec2(ImGui::GetContentRegionAvail().x, oggWindowSize), true);
 			if (ImGui::Button("Export Riser Fusion File")) {
 				auto file = SaveFile("Fusion Text File (.fusion)\0*.fusion\0", "fusion", "");
 				if (file) {
@@ -2186,13 +2185,13 @@ void custom_song_creator_update(size_t width, size_t height) {
 	if (gCtx.currentPak != nullptr) {
 		if (ImGui::BeginTabBar("Tabs")) {
 			if (ImGui::BeginTabItem("Main Properties")) {
+				ImGui::BeginChild("MainMeta",ImVec2(ImGui::GetContentRegionAvail().x/2, ImGui::GetContentRegionAvail().y));
 				display_main_properties();
-
-				ImGui::EndTabItem();
-			}
-
-			if (ImGui::BeginTabItem("Album Art")) {
+				ImGui::EndChild();
+				ImGui::SameLine();
+				ImGui::BeginChild("MainArt", ImGui::GetContentRegionAvail());
 				display_album_art();
+				ImGui::EndChild();
 				ImGui::EndTabItem();
 			}
 			int idx = 0;
@@ -2220,7 +2219,9 @@ void custom_song_creator_update(size_t width, size_t height) {
 	}
 	else {
 		ImGui::Text("Welcome to the Fuser Custom Song Creator!");
-		ImGui::Text("To get started with the default template, choose File -> New from the menu, or use the button:"); ImGui::SameLine();
+		ImGui::Text("To get started with the default template, choose File -> New from the menu, or use the button:"); 
+		ImGui::SameLine();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4);
 		if (ImGui::Button("Create New Custom Song")) {
 			load_template();
 		}

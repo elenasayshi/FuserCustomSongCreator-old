@@ -114,7 +114,15 @@ int __stdcall WinMain(
     // - Read 'docs/FONTS.md' for more instructions and details.
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
     //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
+    ImFont* font0=io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\Consola.ttf", 14.0f);
+    ImFontConfig config;
+    config.MergeMode = true;
+    ImFont* fontcsc = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f,&config,io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+    ImFont* fontctr = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msjh.ttc", 16.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
+    ImFont* fontkor = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\malgun.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesKorean());
+    ImFont* fontjpn = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\Simhei.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesJapanese());
+    if(font0!=NULL && fontcsc!=NULL && fontctr!=NULL && fontkor!=NULL && fontjpn!=NULL)
+        io.Fonts->Build();
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);

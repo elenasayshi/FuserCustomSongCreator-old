@@ -178,6 +178,19 @@ using namespace IMGUI_STB_NAMESPACE;
 void ImGui::StyleColorsDark(ImGuiStyle* dst)
 {
     ImGuiStyle* style = dst ? dst : &ImGui::GetStyle();
+
+    style->FramePadding = ImVec2(5, 5);
+    style->FrameRounding = 4.0f;
+    style->ChildBorderSize = 2.0f;
+    style->ChildRounding = 4.0f;
+    style->ItemSpacing = ImVec2(6, 8);
+    style->ItemInnerSpacing = ImVec2(8, 6);
+    style->IndentSpacing = 25.0f;
+    style->ScrollbarSize = 15.0f;
+    style->ScrollbarRounding = 9.0f;
+    style->GrabMinSize = 5.0f;
+    style->GrabRounding = 3.0f;
+
     ImVec4* colors = style->Colors;
 
     colors[ImGuiCol_Text] = ImVec4(0.9570815563201904f, 0.9447585940361023f, 0.9447585940361023f, 1.0f);

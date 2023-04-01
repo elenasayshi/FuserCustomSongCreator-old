@@ -269,11 +269,14 @@ struct DataBuffer {
 					std::vector<uint8_t> utf16_bytes(reinterpret_cast<const uint8_t*>(utf16_str.data()), reinterpret_cast<const uint8_t*>(utf16_str.data() + utf16_str.size()));
 					utf16_bytes.push_back(0);
 					utf16_bytes.push_back(0);
-
-					size = utf16_str.size() + 1;
+					for (uint8_t c : utf16_bytes) {
+						std::cout << std::to_string(c) + " ";
+					}
+					std::cout << "\n";
+					size = utf16_bytes.size()/2;
 					i32 newsize = 0 - size;
 					serialize(newsize);
-					serialize(utf16_bytes.data(), (size * 2));
+					serialize((u8*)utf16_bytes.data(), size*2);
 				}
 				else {
 					serialize(size);
