@@ -1255,12 +1255,14 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 			map.children.erase(map.children.begin() + mapToErase);
 		}
 		ImGui::EndChild();
+		ImVec2 cursorPos = ImGui::GetCursorPos();
+		cursorPos.y -= 10;
 		ImGui::SameLine();
 
 		ImGui::BeginChild("KeymapSettings", ImVec2((aRegion.x / 3) * 2, ImGui::GetContentRegionAvail().y));
 		display_keyzone_settings(std::get<hmx_fusion_nodes*>(map.children[currentKeyzone].value), moggFiles);
 		ImGui::EndChild();
-
+		
 		ImGui::EndChild();
 	}
 	else {
@@ -1383,7 +1385,6 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 
 void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMode) {
 	ChooseFuserEnum<FuserEnums::Instrument>("Instrument", celData.instrument, false);
-
 	auto&& fusionFile = celData.majorAssets[0].data.fusionFile.data;
 
 	auto&& asset = std::get<HmxAssetFile>(fusionFile.file.e->getData().data.catagoryValues[0].value);
@@ -1699,7 +1700,9 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 					outfile.write((const char*)fileData.data(), fileData.size());
 				}
 			}
-
+			ImGui::InputInt("Tick Length", &celData.tickLength, 0, 0);
+			ImGui::SameLine();
+			HelpMarker("Sets the length in ticks for the custom to loop. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 bars in midi ticks.");
 			auto pickupTableSize = ImGui::GetContentRegionAvail().y;
 			ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170));
 			if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3)-15, ImGui::GetContentRegionAvail().y - 170))) {
@@ -2196,8 +2199,9 @@ void custom_song_creator_update(size_t width, size_t height) {
 			}
 			int idx = 0;
 			for (auto&& cel : gCtx.currentPak->root.celData) {
-				std::string tabName = "Song Cell - ";
+				std::string tabName = "Song Cell "+std::to_string(idx/2)+" - ";
 				tabName += cel.data.type.getString();
+				tabName += "##Cel" + std::to_string(idx / 2);
 				if (ImGui::BeginTabItem(tabName.c_str())) {
 					curCelTab = idx;
 					display_cell_data(cel.data, gCtx.currentPak->root.keyMode);

@@ -810,6 +810,7 @@ struct CelData {
 	std::vector<AssetLink<MidiSongAsset>> majorAssets;
 	std::vector<AssetLink<MidiSongAsset>> minorAssets;
 	ArrayProperty* pickupArray;
+	int tickLength = 61440;
 
 	bool allUnpitched = false;
 
@@ -848,6 +849,10 @@ struct CelData {
 					songTransitionFile.data.allUnpitched = true;
 				}
 			}
+			if (auto tlprop = ctx.getProp<PrimitiveProperty<int>>("SongLengthTicks")) {
+				tickLength=tlprop->data;
+			}
+				
 		}
 
 		shortName = ctx.shortName + type.getSuffix();
@@ -856,7 +861,7 @@ struct CelData {
 
 		ctx.serializeEnum("Instrument", instrument);
 		//ctx.serializeEnum("SubInstrument", subInstrument);
-
+		
 		//@REVISIT
 		file.thisObjectPath = 4;
 		songTransitionFile.data.file.thisObjectPath = 4;
@@ -889,7 +894,7 @@ struct CelData {
 
 		if (!ctx.loading) {
 			ctx.serializeText("Title", ctx.songName);
-
+			
 			i32 bpm = ctx.bpm;
 			while (bpm > 157) bpm = std::ceil(bpm /= 2); //half-time anything faster, recursively
 			if (bpm < 90) bpm = ctx.bpm; //prevent 158-179 bpm from clamping to 90
@@ -916,6 +921,9 @@ struct CelData {
 				prop.prop->value = ctx.getHeader().findOrCreateName(FuserEnums::FromValue<FuserEnums::KeyMode>(FuserEnums::KeyMode::Value::Num));
 			}
 			
+			auto tlprop = ctx.getOrCreateProp<PrimitiveProperty<int>>("SongLengthTicks");
+			tlprop.prop->data = tickLength;
+
 			if (!allUnpitched) {
 				struct Transpose {
 					PropertyData *data;
