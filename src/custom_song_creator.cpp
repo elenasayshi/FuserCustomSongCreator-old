@@ -974,9 +974,16 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 	std::string advBtn = "Switch to Advanced Mode";
 	if (advanced)
 		advBtn = "Switch to Simple Mode";
-
+	std::string riserText = isRiser ? "riser" : "disc";
+	std::string gainInputLabel = std::string(isRiser ? "Riser" : "Disc") + " Gain";
+	std::string gainHelpString = "The gain of the " + riserText + " in dB. If the audio is too loud, increase the gain. If it's too quiet, decrease the gain. 0.00 dB is the default. Thie affects the volume of the whole " + riserText + ", if only one audio file is too quiet/too loud, the volume has to be adjusted for that audio file in your DAW.";
+	float& trackGain = std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getFloat("volume");
+	ImGui::PushItemWidth(150);
+	ImGui::InputFloat(gainInputLabel.c_str(), &trackGain, 0.0f, 0.0f, "%.2f");
+	ImGui::PopItemWidth();
+	ImGui::SameLine();
 	
-
+	HelpMarker(gainHelpString.c_str());
 	if (ImGui::BeginPopupModal("Switch Modes?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
@@ -1070,6 +1077,20 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 				auto&& fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionPackageFile->resourceHeader);
 				fusion.nodes.getInt("edit_advanced") = 0;
 				advanced = false;
+
+				if(celData.tickLength==15360)
+					celData.selectedTickLength = 0; 
+				else if (celData.tickLength == 30720)
+					celData.selectedTickLength = 1;
+				else if (celData.tickLength == 61440)
+					celData.selectedTickLength = 2;
+				else if (celData.tickLength == 122880)
+					celData.selectedTickLength = 3;
+				else {
+					celData.selectedTickLength = 2;
+					celData.tickLength = 61440;
+				}
+				celData.tickLengthAdvanced = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("No", ImVec2(120, 0)))
@@ -1700,9 +1721,40 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 					outfile.write((const char*)fileData.data(), fileData.size());
 				}
 			}
-			ImGui::InputInt("Tick Length", &celData.tickLength, 0, 0);
-			ImGui::SameLine();
-			HelpMarker("Sets the length in ticks for the custom to loop. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 bars in midi ticks.");
+			if (disc_advanced) {
+				ImGui::Checkbox("Advanced Length Input", &celData.tickLengthAdvanced); 
+				ImGui::SameLine();
+				HelpMarker("Will allow the length in ticks for the custom to loop to be set to any value. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 barans in midi ticks.");
+
+			
+			}
+			if (celData.tickLengthAdvanced) {
+				ImGui::InputInt("Tick Length", &celData.tickLength, 0, 0);
+				}
+			else {
+				const char* options[] = { "8 bars", "16 bars","32 bars","64 bars" };
+				if (ImGui::BeginCombo("Disc Length", options[celData.selectedTickLength])) {
+					for (int i = 0; i < 4; i++) {
+						if (ImGui::Selectable(options[i])) {
+							celData.selectedTickLength = i;
+							if (i == 0) {
+								celData.tickLength = 15360;
+							}
+							else if (i == 1) {
+								celData.tickLength = 30720;
+							}
+							else if (i == 2) {
+								celData.tickLength = 61440;
+							}
+							else if (i == 3) {	
+								celData.tickLength = 122880;
+							}
+						}
+					}
+					ImGui::EndCombo();
+				}
+			}
+			
 			auto pickupTableSize = ImGui::GetContentRegionAvail().y;
 			ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170));
 			if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3)-15, ImGui::GetContentRegionAvail().y - 170))) {

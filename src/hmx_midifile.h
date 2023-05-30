@@ -35,6 +35,10 @@ struct hmx_fusion_nodes {
 		return std::get<int>(getChild(key)->value);
 	}
 
+	float& getFloat(const std::string& key) {
+		return std::get<float>(getChild(key)->value);
+	}
+
 	std::string& getString(const std::string &key) {
 		return std::get<std::string>(getChild(key)->value);
 	}

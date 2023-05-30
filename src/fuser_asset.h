@@ -655,7 +655,7 @@ struct SongTransition {
 	std::string shortName;
 	std::vector<AssetLink<MidiSongAsset>> majorAssets;
 	std::vector<AssetLink<MidiSongAsset>> minorAssets;
-
+	float trackGain = 0;
 	bool allUnpitched = false;
 
 	void serialize(SongSerializationCtx &ctx) {
@@ -800,7 +800,8 @@ struct SongTransition {
 
 struct CelData {
 	SongPakEntry file;
-
+	bool tickLengthAdvanced = false;
+	int selectedTickLength = 2;
 	CelType type;
 	FuserEnums::KeyMode::Value mode = FuserEnums::KeyMode::Value::Major;
 	std::string shortName;
@@ -810,6 +811,7 @@ struct CelData {
 	std::vector<AssetLink<MidiSongAsset>> majorAssets;
 	std::vector<AssetLink<MidiSongAsset>> minorAssets;
 	ArrayProperty* pickupArray;
+	float trackGain = 0;
 	int tickLength = 61440;
 
 	bool allUnpitched = false;
@@ -871,7 +873,18 @@ struct CelData {
 		songTransitionFile.serialize(ctx);
 
 		if (ctx.loading) {
-			
+			if (tickLength == 15360) {
+				selectedTickLength = 0;
+			}else if (tickLength == 30720) {
+				selectedTickLength = 1;
+			}else if (tickLength == 61440) {
+				selectedTickLength = 2;
+			}else if (tickLength == 122880) {
+				selectedTickLength = 3;
+			}
+			else {
+				tickLengthAdvanced = true;
+			}
 			for (auto &&v : ctx.getProp<ArrayProperty>("MajorMidiSongAssets")->values) {
 				AssetLink<MidiSongAsset> midiAsset;
 				midiAsset.ref = std::get<SoftObjectProperty>(v->v).name;
