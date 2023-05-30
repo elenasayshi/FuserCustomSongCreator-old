@@ -91,7 +91,7 @@ void display_playable_audio(PlayableAudio& audio, std::string addString) {
 
 	auto active = BASS_ChannelIsActive(audio.channelHandle);
 	if (active != BASS_ACTIVE_PLAYING) {
-		std::string buttonText = "Play Audio##"+addString;
+		std::string buttonText = "Play Audio##" + addString;
 		if (addString == "") {
 			buttonText = "Play Audio";
 		}
@@ -204,7 +204,7 @@ static void HelpMarker(const char* desc)
 }
 
 template<typename T>
-static void ChooseFuserEnum(const char* label, std::string& out,bool hideLast=true) {
+static void ChooseFuserEnum(const char* label, std::string& out, bool hideLast = true) {
 	auto values = T::GetValues();
 
 	int itemsCount = values.size();
@@ -382,7 +382,7 @@ void load_file(DataBuffer&& dataBuf) {
 		__debugbreak();
 	}
 
-	
+
 	if (gCtx.has_art) {
 		SongSerializationCtx ctx;
 		ctx.loading = true;
@@ -494,7 +494,7 @@ void load_file(DataBuffer&& dataBuf) {
 		}
 
 	}
-	
+
 }
 
 void load_template() {
@@ -509,7 +509,7 @@ void save_file() {
 	SongSerializationCtx ctx;
 	ctx.loading = false;
 	ctx.pak = &gCtx.currentPak->pak;
-	
+
 	gCtx.currentPak->root.serialize(ctx);
 
 
@@ -591,7 +591,7 @@ void display_main_properties() {
 	ImGui::InputScalar("BPM", ImGuiDataType_S32, &root.bpm);
 	ChooseFuserEnum<FuserEnums::Key>("Key", root.songKey);
 	ChooseFuserEnum<FuserEnums::KeyMode>("Mode", root.keyMode);
-	ChooseFuserEnum<FuserEnums::Genre>("Genre", root.genre,false);
+	ChooseFuserEnum<FuserEnums::Genre>("Genre", root.genre, false);
 	ImGui::InputScalar("Year", ImGuiDataType_S32, &root.year);
 }
 //#include "stb_image_write.h"
@@ -603,7 +603,7 @@ void update_texture(std::string filepath, AssetLink<IconFileAsset> icon) {
 	for (int mip_index = 0; mip_index < texture->mips.size(); mip_index++) {
 		texture->mips[mip_index].width = (texture->mips[mip_index].width + 3) & ~3;
 		texture->mips[mip_index].height = (texture->mips[mip_index].height + 3) & ~3;
- 
+
 
 
 		uint8_t* raw_data = gCtx.art.resizeAndGetData(texture->mips[mip_index].width, texture->mips[mip_index].height);
@@ -674,7 +674,7 @@ std::string lastMoggError;
 void display_mogg_settings(FusionFileAsset& fusionFile, size_t idx, HmxAudio::PackageFile& mogg, std::string addString) {
 
 	auto&& header = std::get<HmxAudio::PackageFile::MoggSampleResourceHeader>(mogg.resourceHeader);
-	std::string buttonText = "Replace Audio##"+addString;
+	std::string buttonText = "Replace Audio##" + addString;
 	if (addString == "") {
 		buttonText = "Replace Audio";
 	}
@@ -881,7 +881,7 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		}
 		ImGui::SameLine();
 		HelpMarker("Slows down or speeds up the audio with the tempo.");
-		
+
 		ImGui::TextWrapped("For audio to sync properly if it's meant to sync to the tempo and play on multiple notes, both Maintain Time and Sync Tempo have to be enabled.");
 
 		ImGui::PushItemWidth(itemWidth);
@@ -948,14 +948,14 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 
 void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vector<HmxAudio::PackageFile*>& moggFiles, FusionFileAsset& fusionFile, HmxAudio::PackageFile* fusionPackageFile, bool duplicate_moggs, bool isRiser = false)
 {
-	if (isRiser) 
+	if (isRiser)
 		curCelTabOffset = 1;
 	else
 		curCelTabOffset = 0;
 
 
 
-	if (curCelTab+curCelTabOffset != lastCelTab) {
+	if (curCelTab + curCelTabOffset != lastCelTab) {
 		currentAudioFile = 0;
 		currentKeyzone = 0;
 		selectedAudioFile = 0;
@@ -969,14 +969,21 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 
 	auto&& fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionPackageFile->resourceHeader);
 	auto& map = fusion.nodes.getNode("keymap");
-	
+
 	bool advanced = fusion.nodes.getInt("edit_advanced") == 1;
 	std::string advBtn = "Switch to Advanced Mode";
 	if (advanced)
 		advBtn = "Switch to Simple Mode";
+	std::string riserText = isRiser ? "riser" : "disc";
+	std::string gainInputLabel = std::string(isRiser ? "Riser" : "Disc") + " Gain";
+	std::string gainHelpString = "The gain of the " + riserText + " in dB. If the audio is too loud, decrease the gain. If it's too quiet, increase the gain. 0.00 dB is the default. Thie affects the volume of the whole " + riserText + ", if only one audio file is too quiet/too loud, the volume has to be adjusted for that audio file in your DAW.";
+	float& trackGain = std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getFloat("volume");
+	ImGui::PushItemWidth(150);
+	ImGui::InputFloat(gainInputLabel.c_str(), &trackGain, 0.0f, 0.0f, "%.2f");
+	ImGui::PopItemWidth();
+	ImGui::SameLine();
 
-	
-
+	HelpMarker(gainHelpString.c_str());
 	if (ImGui::BeginPopupModal("Switch Modes?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
@@ -1001,7 +1008,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 				int audioFileCount = 0;
 				for (auto it = asset.audio.audioFiles.begin(); it != asset.audio.audioFiles.end();) {
 					if (it->fileType == "MoggSampleResource") {
-						if (audioFileCount == 2 || usedFileNames.count(it->fileName)==0) {
+						if (audioFileCount == 2 || usedFileNames.count(it->fileName) == 0) {
 							it = asset.audio.audioFiles.erase(it);
 						}
 						else {
@@ -1033,8 +1040,8 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 						moggFiles.emplace_back(&file);
 					}
 				}
-				
-				
+
+
 				std::vector<hmx_fusion_nodes*>nodes;
 				nodes.emplace_back(std::get<hmx_fusion_nodes*>(map.children[0].value));
 				nodes.emplace_back(std::get<hmx_fusion_nodes*>(map.children[1].value));
@@ -1070,6 +1077,20 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 				auto&& fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionPackageFile->resourceHeader);
 				fusion.nodes.getInt("edit_advanced") = 0;
 				advanced = false;
+
+				if (celData.tickLength == 15360)
+					celData.selectedTickLength = 0;
+				else if (celData.tickLength == 30720)
+					celData.selectedTickLength = 1;
+				else if (celData.tickLength == 61440)
+					celData.selectedTickLength = 2;
+				else if (celData.tickLength == 122880)
+					celData.selectedTickLength = 3;
+				else {
+					celData.selectedTickLength = 2;
+					celData.tickLength = 61440;
+				}
+				celData.tickLengthAdvanced = false;
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("No", ImVec2(120, 0)))
@@ -1102,7 +1123,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 		ImGui::EndPopup();
 	}
 
-	
+
 
 
 	if (advanced) {
@@ -1218,7 +1239,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 		if (currentKeyzone >= map.children.size())
 			currentKeyzone = 0;
 		ImGui::BeginChild("KeyzoneTableAndButtons", ImVec2(aRegion.x / 3, (aRegion.y / 2)));
-		ImGui::BeginChild("KeyzoneTableHolder", ImVec2(aRegion.x / 3, (aRegion.y / 2)-50));
+		ImGui::BeginChild("KeyzoneTableHolder", ImVec2(aRegion.x / 3, (aRegion.y / 2) - 50));
 		if (ImGui::BeginTable("KeyzoneTable", 2, 0, ImVec2(aRegion.x / 3, (aRegion.y / 2) - 50))) {
 			ImGui::TableSetupColumn("Index", 0, 0.2);
 			ImGui::TableSetupColumn("Keyzone Label");
@@ -1236,7 +1257,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 			ImGui::EndTable();
 		}
 
-		
+
 
 		ImGui::EndChild();
 		if (ImGui::Button("Add Keyzone")) {
@@ -1262,7 +1283,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 		ImGui::BeginChild("KeymapSettings", ImVec2((aRegion.x / 3) * 2, ImGui::GetContentRegionAvail().y));
 		display_keyzone_settings(std::get<hmx_fusion_nodes*>(map.children[currentKeyzone].value), moggFiles);
 		ImGui::EndChild();
-		
+
 		ImGui::EndChild();
 	}
 	else {
@@ -1349,16 +1370,16 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 			else {
 				nodes[0]->getInt("unpitched") = 0;
 				nodes[1]->getInt("unpitched") = 0;
-			}	
+			}
 		}
 
-		if(isRiser){
-				nodes[0]->getInt("singleton") = 0;
-				nodes[1]->getInt("singleton") = 0;
+		if (isRiser) {
+			nodes[0]->getInt("singleton") = 0;
+			nodes[1]->getInt("singleton") = 0;
 		}
 		else {
-				nodes[0]->getInt("singleton") = 1;
-				nodes[1]->getInt("singleton") = 1;
+			nodes[0]->getInt("singleton") = 1;
+			nodes[1]->getInt("singleton") = 1;
 		}
 
 		auto&& ts = nodes[0]->getNode("timestretch_settings");
@@ -1378,7 +1399,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 		}
 		ImGui::EndChild();
 	}
-	
+
 	if (ImGui::Button(advBtn.c_str()))
 		ImGui::OpenPopup("Switch Modes?");
 }
@@ -1477,9 +1498,9 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 					else
 						kmpreset.value = 3;
 				}
-				
 
-				
+
+
 
 				nodes->children.insert(nodes->children.begin(), kmpreset);
 			}
@@ -1580,7 +1601,7 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 					else
 						kmpreset.value = 3;
 				}
-				
+
 				nodesRiser->children.insert(nodesRiser->children.begin(), kmpreset);
 			}
 			mapidx++;
@@ -1700,159 +1721,189 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 					outfile.write((const char*)fileData.data(), fileData.size());
 				}
 			}
-			ImGui::InputInt("Tick Length", &celData.tickLength, 0, 0);
-			ImGui::SameLine();
-			HelpMarker("Sets the length in ticks for the custom to loop. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 bars in midi ticks.");
-			auto pickupTableSize = ImGui::GetContentRegionAvail().y;
-			ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170));
-			if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3)-15, ImGui::GetContentRegionAvail().y - 170))) {
-				ImGui::TableSetupColumn("Index", 0, 0.2);
-				ImGui::TableSetupColumn("Pickup Beat");
-				ImGui::TableHeadersRow();
-				if (celData.pickupArray->values.size() > 0) {
-					for (int i = 0; i < celData.pickupArray->values.size(); i++)
-					{
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						if (ImGui::Selectable((std::to_string(i)).c_str(), curPickup == i, ImGuiSelectableFlags_SpanAllColumns)) {
-							curPickup = i;
-							pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data;
-						}
-						ImGui::TableNextColumn();
-						std::string pickupPos = std::to_string(std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data);
-						pickupPos = pickupPos.substr(0, pickupPos.find(".") + 3);
-						ImGui::Text(pickupPos.c_str());
-					}
-				}
+			if (disc_advanced) {
+				ImGui::Checkbox("Advanced Length Input", &celData.tickLengthAdvanced);
+				ImGui::SameLine();
+				HelpMarker("Will allow the length in ticks for the custom to loop to be set to any value. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 barans in midi ticks.");
 
-				ImGui::EndTable();
+
 			}
-			ImGui::EndChild();
-			ImGui::BeginChild("PickupButtons", ImVec2(windowSize.x / 3, 145));
-			if (ImGui::InputFloat("Pickup Beat", &pickupInput, 0.0F, 0.0F, "%.2f")) {
-				pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
+			if (celData.tickLengthAdvanced) {
+				ImGui::InputInt("Tick Length", &celData.tickLength, 0, 0);
 			}
-			if (ImGui::Button("Add Pickup")) {
-				pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
-
-				if (celData.pickupArray->values.size() > 0) {
-					std::vector<float> pickups;
-
-					for (auto puv : celData.pickupArray->values) {
-						pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
-					}
-
-					auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
-
-					if (it == pickups.end()) {
-						pickups.emplace_back(pickupInput);
-						std::sort(pickups.begin(), pickups.end());
-						auto last = std::unique(pickups.begin(), pickups.end());
-						pickups.erase(last, pickups.end());
-						celData.pickupArray->values.clear();
-						for (int i = 0; i < pickups.size(); i++) {
-							celData.pickupArray->values.emplace_back(new IPropertyValue);
-							celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
-							std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
-						}
-						auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
-						if (it2 != pickups.end()) {
-							curPickup = std::distance(pickups.begin(), it2);
+			else {
+				const char* options[] = { "8 bars", "16 bars","32 bars","64 bars" };
+				if (ImGui::BeginCombo("Disc Length", options[celData.selectedTickLength])) {
+					for (int i = 0; i < 4; i++) {
+						if (ImGui::Selectable(options[i])) {
+							celData.selectedTickLength = i;
+							if (i == 0) {
+								celData.tickLength = 15360;
+							}
+							else if (i == 1) {
+								celData.tickLength = 30720;
+							}
+							else if (i == 2) {
+								celData.tickLength = 61440;
+							}
+							else if (i == 3) {
+								celData.tickLength = 122880;
+							}
 						}
 					}
+					ImGui::EndCombo();
 				}
-				else {
-					celData.pickupArray->values.emplace_back(new IPropertyValue);
-					celData.pickupArray->values[0]->v = asset_helper::createPropertyValue("FloatProperty");
-					std::get<PrimitiveProperty<float>>(celData.pickupArray->values[0]->v).data = pickupInput;
-					curPickup = 0;
-				}
-
-
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Update Pickup") && celData.pickupArray->values.size() > 0) {
-				pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
-				if (celData.pickupArray->values.size() == 1) {
-					std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data = pickupInput;
-				}
-				else {
-					std::vector<float> pickups;
-					for (auto puv : celData.pickupArray->values) {
-						pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
-					}
-
-					auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
-					if (it == pickups.end()) {
-						pickups[curPickup] = pickupInput;
-						std::sort(pickups.begin(), pickups.end());
-						auto last = std::unique(pickups.begin(), pickups.end());
-						pickups.erase(last, pickups.end());
-						celData.pickupArray->values.clear();
-						for (int i = 0; i < pickups.size(); i++) {
-							celData.pickupArray->values.emplace_back(new IPropertyValue);
-							celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
-							std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
-						}
-						auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
-						if (it2 != pickups.end()) {
-							curPickup = std::distance(pickups.begin(), it2);
+				auto pickupTableSize = ImGui::GetContentRegionAvail().y;
+				ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170));
+				if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170))) {
+					ImGui::TableSetupColumn("Index", 0, 0.2);
+					ImGui::TableSetupColumn("Pickup Beat");
+					ImGui::TableHeadersRow();
+					if (celData.pickupArray->values.size() > 0) {
+						for (int i = 0; i < celData.pickupArray->values.size(); i++)
+						{
+							ImGui::TableNextRow();
+							ImGui::TableNextColumn();
+							if (ImGui::Selectable((std::to_string(i)).c_str(), curPickup == i, ImGuiSelectableFlags_SpanAllColumns)) {
+								curPickup = i;
+								pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data;
+							}
+							ImGui::TableNextColumn();
+							std::string pickupPos = std::to_string(std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data);
+							pickupPos = pickupPos.substr(0, pickupPos.find(".") + 3);
+							ImGui::Text(pickupPos.c_str());
 						}
 					}
-				}
 
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Remove Pickup") && celData.pickupArray->values.size() > 0) {
-				int pickupToErase = curPickup;
-				if (curPickup == celData.pickupArray->values.size() - 1) {
-					curPickup--;
+					ImGui::EndTable();
 				}
-				celData.pickupArray->values.erase(celData.pickupArray->values.begin() + pickupToErase);
-				if (celData.pickupArray->values.size() > 0) {
-					pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data;
-				}
-
-			}
-			ImGui::NewLine();
-			ImGui::NewLine();
-			if (ImGui::Button("Clear Pickups")) {
-				ImGui::OpenPopup("Clear Pickups?");
-			}
-			
-			ImGui::PopStyleColor();
-			if (ImGui::BeginPopupModal("Clear Pickups?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-			{
-				ImGui::BeginChild("Text", ImVec2(420, 69));
-				ImGui::Text("Are you sure you would like to clear pickups?");
-				ImGui::TextWrapped("WARNING: Will erase all pickups");
 				ImGui::EndChild();
-				ImGui::BeginChild("Buttons", ImVec2(420, 25));
-				if (ImGui::Button("Yes", ImVec2(120, 0)))
-				{
-					celData.pickupArray->values.clear();
-					curPickup = -1;
-					ImGui::CloseCurrentPopup();
+				ImGui::BeginChild("PickupButtons", ImVec2(windowSize.x / 3, 145));
+				if (ImGui::InputFloat("Pickup Beat", &pickupInput, 0.0F, 0.0F, "%.2f")) {
+					pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
+				}
+				if (ImGui::Button("Add Pickup")) {
+					pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
+
+					if (celData.pickupArray->values.size() > 0) {
+						std::vector<float> pickups;
+
+						for (auto puv : celData.pickupArray->values) {
+							pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
+						}
+
+						auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
+
+						if (it == pickups.end()) {
+							pickups.emplace_back(pickupInput);
+							std::sort(pickups.begin(), pickups.end());
+							auto last = std::unique(pickups.begin(), pickups.end());
+							pickups.erase(last, pickups.end());
+							celData.pickupArray->values.clear();
+							for (int i = 0; i < pickups.size(); i++) {
+								celData.pickupArray->values.emplace_back(new IPropertyValue);
+								celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
+								std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
+							}
+							auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
+							if (it2 != pickups.end()) {
+								curPickup = std::distance(pickups.begin(), it2);
+							}
+						}
+					}
+					else {
+						celData.pickupArray->values.emplace_back(new IPropertyValue);
+						celData.pickupArray->values[0]->v = asset_helper::createPropertyValue("FloatProperty");
+						std::get<PrimitiveProperty<float>>(celData.pickupArray->values[0]->v).data = pickupInput;
+						curPickup = 0;
+					}
+
+
 				}
 				ImGui::SameLine();
-				if (ImGui::Button("No", ImVec2(120, 0)))
-				{
-					ImGui::CloseCurrentPopup();
+				if (ImGui::Button("Update Pickup") && celData.pickupArray->values.size() > 0) {
+					pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
+					if (celData.pickupArray->values.size() == 1) {
+						std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data = pickupInput;
+					}
+					else {
+						std::vector<float> pickups;
+						for (auto puv : celData.pickupArray->values) {
+							pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
+						}
+
+						auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
+						if (it == pickups.end()) {
+							pickups[curPickup] = pickupInput;
+							std::sort(pickups.begin(), pickups.end());
+							auto last = std::unique(pickups.begin(), pickups.end());
+							pickups.erase(last, pickups.end());
+							celData.pickupArray->values.clear();
+							for (int i = 0; i < pickups.size(); i++) {
+								celData.pickupArray->values.emplace_back(new IPropertyValue);
+								celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
+								std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
+							}
+							auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
+							if (it2 != pickups.end()) {
+								curPickup = std::distance(pickups.begin(), it2);
+							}
+						}
+					}
+
 				}
+				ImGui::SameLine();
+				if (ImGui::Button("Remove Pickup") && celData.pickupArray->values.size() > 0) {
+					int pickupToErase = curPickup;
+					if (curPickup == celData.pickupArray->values.size() - 1) {
+						curPickup--;
+					}
+					celData.pickupArray->values.erase(celData.pickupArray->values.begin() + pickupToErase);
+					if (celData.pickupArray->values.size() > 0) {
+						pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data;
+					}
+
+				}
+				ImGui::NewLine();
+				ImGui::NewLine();
+				if (ImGui::Button("Clear Pickups")) {
+					ImGui::OpenPopup("Clear Pickups?");
+				}
+
+				ImGui::PopStyleColor();
+				if (ImGui::BeginPopupModal("Clear Pickups?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+				{
+					ImGui::BeginChild("Text", ImVec2(420, 69));
+					ImGui::Text("Are you sure you would like to clear pickups?");
+					ImGui::TextWrapped("WARNING: Will erase all pickups");
+					ImGui::EndChild();
+					ImGui::BeginChild("Buttons", ImVec2(420, 25));
+					if (ImGui::Button("Yes", ImVec2(120, 0)))
+					{
+						celData.pickupArray->values.clear();
+						curPickup = -1;
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("No", ImVec2(120, 0)))
+					{
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::EndChild();
+
+
+					ImGui::EndPopup();
+				}
+
 				ImGui::EndChild();
 
 
-				ImGui::EndPopup();
+				ImGui::EndChild();
+				ImGui::EndTabItem();
 			}
-
-			ImGui::EndChild();
-
-
-			ImGui::EndChild();
-			ImGui::EndTabItem();
 		}
 		if (ImGui::BeginTabItem("Riser Audio")) {
-			ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize),true);
+			ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize), true);
 			display_cel_audio_options(celData, assetRiser, moggFilesRiser, fusionFileRiser, fusionPackageFileRiser, duplicate_moggsRiser, true);
 			ImGui::EndChild();
 			ImGui::SameLine();
@@ -1961,6 +2012,9 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();
+
+
+
 	}
 
 	if (celData.type.value == CelType::Type::Beat) {
@@ -1984,7 +2038,7 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 		celData.allUnpitched = false;
 		celData.songTransitionFile.data.allUnpitched = false;
 	}
-		
+
 }
 void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice) {
 	gCtx.g_pd3dDevice = g_pd3dDevice;
@@ -2010,9 +2064,9 @@ void custom_song_creator_update(size_t width, size_t height) {
 				}
 			}
 			else {
-				ImGui::MenuItem("Save", "Ctrl+S",false,false);
+				ImGui::MenuItem("Save", "Ctrl+S", false, false);
 			}
-			
+
 
 			if (ImGui::MenuItem("Save As..")) {
 				select_save_location();
@@ -2128,16 +2182,16 @@ void custom_song_creator_update(size_t width, size_t height) {
 						auto fileData = getData(a);
 						std::ofstream outfile(*out_file, std::ios_base::binary);
 						outfile.write((const char*)fileData.data(), fileData.size());
+					}
+				}
 			}
-		}
-	}
 
 			ImGui::EndMenu();
-}
+	}
 #endif
 
 		ImGui::EndMainMenuBar();
-	}
+}
 
 	auto&& input = ImGui::GetIO();
 
@@ -2188,7 +2242,7 @@ void custom_song_creator_update(size_t width, size_t height) {
 	if (gCtx.currentPak != nullptr) {
 		if (ImGui::BeginTabBar("Tabs")) {
 			if (ImGui::BeginTabItem("Main Properties")) {
-				ImGui::BeginChild("MainMeta",ImVec2(ImGui::GetContentRegionAvail().x/2, ImGui::GetContentRegionAvail().y));
+				ImGui::BeginChild("MainMeta", ImVec2(ImGui::GetContentRegionAvail().x / 2, ImGui::GetContentRegionAvail().y));
 				display_main_properties();
 				ImGui::EndChild();
 				ImGui::SameLine();
@@ -2199,7 +2253,7 @@ void custom_song_creator_update(size_t width, size_t height) {
 			}
 			int idx = 0;
 			for (auto&& cel : gCtx.currentPak->root.celData) {
-				std::string tabName = "Song Cell "+std::to_string(idx/2)+" - ";
+				std::string tabName = "Song Cell " + std::to_string(idx / 2) + " - ";
 				tabName += cel.data.type.getString();
 				tabName += "##Cel" + std::to_string(idx / 2);
 				if (ImGui::BeginTabItem(tabName.c_str())) {
@@ -2207,7 +2261,7 @@ void custom_song_creator_update(size_t width, size_t height) {
 					display_cell_data(cel.data, gCtx.currentPak->root.keyMode);
 					ImGui::EndTabItem();
 				}
-				idx+=2;
+				idx += 2;
 			}
 
 			ImGui::EndTabBar();
@@ -2223,7 +2277,7 @@ void custom_song_creator_update(size_t width, size_t height) {
 	}
 	else {
 		ImGui::Text("Welcome to the Fuser Custom Song Creator!");
-		ImGui::Text("To get started with the default template, choose File -> New from the menu, or use the button:"); 
+		ImGui::Text("To get started with the default template, choose File -> New from the menu, or use the button:");
 		ImGui::SameLine();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4);
 		if (ImGui::Button("Create New Custom Song")) {
