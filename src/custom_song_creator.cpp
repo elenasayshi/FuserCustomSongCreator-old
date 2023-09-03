@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include <Windows.h>
+#include <shlwapi.h>
 
 #include "uasset.h"
 #include "imgui.h"
@@ -32,6 +33,14 @@ namespace fs = std::filesystem;
 
 extern HWND G_hwnd;
 
+bool endsWith(const std::string& str, const std::string& suffix) {
+	if (str.size() >= suffix.size()) {
+		return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+	}
+	else {
+		return false;  // The string is shorter than the suffix
+	}
+}
 
 struct AudioCtx {
 	HSAMPLE currentMusic = 0;
@@ -298,6 +307,7 @@ static std::optional<std::string> SaveFile(LPCSTR filter, LPCSTR ext, const std:
 	return std::nullopt;
 }
 
+
 struct MainContext {
 	std::string saveLocation;
 	bool has_art;
@@ -410,7 +420,7 @@ void load_file(DataBuffer&& dataBuf) {
 			celShortName.emplace_back(cel.data.shortName);
 			auto&& fusionFile = cel.data.majorAssets[0].data.fusionFile.data;
 			auto&& asset = std::get<HmxAssetFile>(fusionFile.file.e->getData().data.catagoryValues[0].value);
-			//auto &&mogg = asset.audio.audioFiles[0];
+			auto &&mogg = asset.audio.audioFiles[0];
 
 			HmxAudio::PackageFile fusionPackageFile;
 			std::vector<HmxAudio::PackageFile> moggFiles;
@@ -448,7 +458,7 @@ void load_file(DataBuffer&& dataBuf) {
 			cel.data.shortName = celShortName[idx];
 			auto&& fusionFile = cel.data.majorAssets[0].data.fusionFile.data;
 			auto&& asset = std::get<HmxAssetFile>(fusionFile.file.e->getData().data.catagoryValues[0].value);
-			//auto &&mogg = asset.audio.audioFiles[0];
+			auto &&mogg = asset.audio.audioFiles[0];
 
 			cel.data.instrument = instrumentTypes[idx];
 			HmxAudio::PackageFile* fusionPackageFile = nullptr;
@@ -553,7 +563,7 @@ void save_file() {
 bool Error_InvalidFileName = false;
 void select_save_location() {
 	auto fileName = gCtx.currentPak->root.shortName + "_P.pak";
-	auto location = SaveFile("Fuser Custom Song (*.pak)\0*.pak\0", "pak", fileName);
+	auto location = SaveFile("Fuser Custom Song (*.pak)\0*.pak\0","pak", fileName);
 	if (location) {
 		auto path = fs::path(*location);
 		auto savedFileName = path.stem().string() + path.extension().string();
@@ -846,7 +856,6 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		}
 		ImGui::EndCombo();
 	}
-
 	if (ImGui::CollapsingHeader("Advanced Keymap Settings")) {
 
 		bool sng = keyzone->getInt("singleton") == 1;
@@ -884,7 +893,37 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 
 		ImGui::TextWrapped("For audio to sync properly if it's meant to sync to the tempo and play on multiple notes, both Maintain Time and Sync Tempo have to be enabled.");
 
+		bool vel2vol = keyzone->getInt("velocity_to_volume") == 1;
+		bool vel2vol_changed = ImGui::Checkbox("Velocity to Volume", &vel2vol);
+		if (vel2vol_changed) {
+			if (vel2vol)
+				keyzone->getInt("velocity_to_volume") = 1;
+			else
+				keyzone->getInt("velocity_to_volume") = 0;
+		}
+		ImGui::SameLine();
+		HelpMarker("If checked, the midi note velocity will control the volume of the sample");
+		float& kzvol = keyzone->getFloat("volume");
+		ImGui::PushItemWidth(150);
+		ImGui::InputFloat("Volume", &kzvol, 0.0f, 0.0f, "%.2f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		HelpMarker("The volume of the keyzone. 0 means it's the same volume as the imported audio, negative values make it quieter, positive values make it louder. This is relative to the gain for the disc/riser.");
+
+		ImGui::SameLine(); 
+		float& kzpan = keyzone->getNode("pan").getFloat("position");
+		if (kzpan < -1)
+			kzpan = -1;
+		else if (kzpan > 1)
+			kzpan = 1;
+		ImGui::PushItemWidth(150);
+		ImGui::InputFloat("Pan", &kzpan, 0.0f, 0.0f, "%.2f");
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		HelpMarker("Panning of the keyzone. -1 is left, 1 is right, 0 is center");
+
 		ImGui::PushItemWidth(itemWidth);
+
 		if (ImGui::InputScalar("Map - Min Note", ImGuiDataType_U32, &keyzone->getInt("min_note"))) {
 			selectedPreset = 3;
 			keyzone->getInt("keymap_preset") = 3;
@@ -1670,23 +1709,39 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			}
 
 			if (overwrite_midi) {
-				auto file = OpenFile("Harmonix Midi Resource File (.mid_pc)\0*.mid_pc\0");
-				if (file) {
-					AssetLink<MidiSongAsset>* midiSong = nullptr;
-					if (maj) {
-						midiSong = &celData.majorAssets[0];
-					}
-					else {
-						midiSong = &celData.minorAssets[0];
-					}
+				try {
+					auto file = OpenFile("MIDI (.mid)\0*.mid\0Harmonix Midi Resource File (.mid_pc)\0*.mid_pc\0");
+					if (file) {
+						AssetLink<MidiSongAsset>* midiSong = nullptr;
+						if (maj) {
+							midiSong = &celData.majorAssets[0];
+						}
+						else {
+							midiSong = &celData.minorAssets[0];
+						}
 
-					auto&& midi_file = midiSong->data.midiFile.data;
-					auto&& midiAsset = std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value);
+						auto&& midi_file = midiSong->data.midiFile.data;
+						auto&& midiAsset = std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value);
 
-					std::ifstream infile(*file, std::ios_base::binary);
-					std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
-					midiAsset.audio.audioFiles[0].fileData = std::move(fileData);
+						HmxAudio::PackageFile::MidiFileResource mfr;
+
+						if (endsWith(*file, ".mid")) {
+							mfr.MFR_from_midi(*file);
+						}
+						else if (endsWith(*file, ".mid_pc")) {
+							mfr.MFRImport(*file);
+						}
+
+						if (mfr.magic == 2) {
+							midiAsset.audio.audioFiles[0].resourceHeader = std::move(mfr);
+						}
+						
+					}
 				}
+				catch (const std::exception& ex) {
+					ErrorModal("Overwrite MIDI Failed", ex.what());
+				}
+				
 			}
 
 			ImGui::Spacing();
@@ -1703,28 +1758,31 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			}
 
 			if (export_midi) {
-				auto file = SaveFile("Harmonix Midi Resource File (.mid_pc)\0*.mid_pc\0", "mid_pc", "");
-				if (file) {
-					AssetLink<MidiSongAsset>* midiSong = nullptr;
-					if (maj) {
-						midiSong = &celData.majorAssets[0];
-					}
-					else {
-						midiSong = &celData.minorAssets[0];
-					}
+				try {
 
-					auto&& midi_file = midiSong->data.midiFile.data;
-					auto&& midiAsset = std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value);
-					auto&& fileData = midiAsset.audio.audioFiles[0].fileData;
+					auto file = SaveFile("MIDI (.mid)\0*.mid\0", "mid", "");
+					if (file) {
+						AssetLink<MidiSongAsset>* midiSong = nullptr;
+						if (maj) {
+							midiSong = &celData.majorAssets[0];
+						}
+						else {
+							midiSong = &celData.minorAssets[0];
+						}
 
-					std::ofstream outfile(*file, std::ios_base::binary);
-					outfile.write((const char*)fileData.data(), fileData.size());
+						auto&& midi_file = midiSong->data.midiFile.data;
+						auto&& midiAsset = std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value);
+						std::get<HmxAudio::PackageFile::MidiFileResource>(midiAsset.audio.audioFiles[0].resourceHeader).MFR_to_midi(*file);
+					}
+				}
+				catch (const std::exception& ex) {
+					ErrorModal("Save MIDI Failed", ex.what());
 				}
 			}
 			if (disc_advanced) {
 				ImGui::Checkbox("Advanced Length Input", &celData.tickLengthAdvanced);
 				ImGui::SameLine();
-				HelpMarker("Will allow the length in ticks for the custom to loop to be set to any value. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 barans in midi ticks.");
+				HelpMarker("Will allow the length in ticks for the custom to loop to be set to any value. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 bars in midi ticks.");
 
 
 			}
@@ -1955,22 +2013,36 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			}
 
 			if (overwrite_midiRiser) {
-				auto file = OpenFile("Harmonix Midi Resource File (.mid_pc)\0*.mid_pc\0");
-				if (file) {
-					AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
-					if (majRiser) {
-						midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
-					}
-					else {
-						midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
-					}
+				try {
+					auto file = OpenFile("MIDI File (.mid)\0*.mid\0");
+					if (file) {
+						AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
+						if (majRiser) {
+							midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
+						}
+						else {
+							midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
+						}
 
-					auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
-					auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
+						auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
+						auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
 
-					std::ifstream infile(*file, std::ios_base::binary);
-					std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
-					midiAssetRiser.audio.audioFiles[0].fileData = std::move(fileData);
+						HmxAudio::PackageFile::MidiFileResource mfr;
+
+						if (endsWith(*file, ".mid")) {
+							mfr.MFR_from_midi(*file);
+						}
+						else if (endsWith(*file, ".mid_pc")) {
+							mfr.MFRImport(*file);
+						}
+
+						if (mfr.magic == 2) {
+							midiAssetRiser.audio.audioFiles[0].resourceHeader = std::move(mfr);
+						}
+					}
+				}
+				catch (const std::exception& ex) {
+					ErrorModal("Overwrite MIDI Failed", ex.what());
 				}
 			}
 
@@ -1989,23 +2061,26 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			}
 
 			if (export_midiRiser) {
-				auto file = SaveFile("Harmonix Midi Resource File (.mid_pc)\0*.mid_pc\0", "mid_pc", "");
-				if (file) {
-					AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
-					if (majRiser) {
-						midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
-					}
-					else {
-						midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
-					}
+				try {
+					auto file = SaveFile("MIDI (.mid)\0*.mid\0", "mid", "");
+					if (file) {
+						AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
+						if (majRiser) {
+							midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
+						}
+						else {
+							midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
+						}
 
-					auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
-					auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
-					auto&& fileDataRiser = midiAssetRiser.audio.audioFiles[0].fileData;
-
-					std::ofstream outfile(*file, std::ios_base::binary);
-					outfile.write((const char*)fileDataRiser.data(), fileDataRiser.size());
+						auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
+						auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
+						std::get<HmxAudio::PackageFile::MidiFileResource>(midiAssetRiser.audio.audioFiles[0].resourceHeader).MFR_to_midi(*file);
+					}
 				}
+				catch (const std::exception& ex) {
+					ErrorModal("Save MIDI Failed", ex.what());
+				}
+				
 			}
 			ImGui::PopStyleColor();
 			ImGui::EndChild();

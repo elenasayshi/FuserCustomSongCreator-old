@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 file(GLOB SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/stream-helpers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/stream-helpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SMF.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SMF.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/uasset.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/fuser_asset.cpp
@@ -18,7 +22,6 @@ file(GLOB SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DDSFile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/stb_image.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/stb_image_resize.h
-
 
     ${CMAKE_CURRENT_SOURCE_DIR}/moggcrypt/aes.c
     ${CMAKE_CURRENT_SOURCE_DIR}/moggcrypt/CCallbacks.cpp
@@ -44,6 +47,7 @@ target_include_directories(Fuser_CustomSongCreator PUBLIC "${CMAKE_CURRENT_SOURC
 
 target_link_libraries(
     Fuser_CustomSongCreator
+    "shlwapi.lib"
     "d3d11.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/bass/bass.lib"
 )

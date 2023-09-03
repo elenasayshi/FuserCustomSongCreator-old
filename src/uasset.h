@@ -3,8 +3,10 @@
 #include "sha1.h"
 #include "crc.h"
 #include "hmx_midifile.h"
+#include "SMF.h"
 #include <codecvt>
 #include <iostream>
+#include <cmath>
 
 struct AssetHeader;
 
@@ -932,6 +934,569 @@ struct HmxAudio {
 			}
 		};
 
+		struct MidiFileResource {
+			struct MFRTrack {
+				u32 trackname_str_idx;
+				struct MFREvent {
+					u32 tick;
+					u8 event_type;
+					struct EventData_Midi {
+						u8 channel;
+						u8 type;
+						u8 note;
+						u8 velocity;
+						void serialize(DataBuffer& buffer) {
+							u8 tc;
+							if (buffer.loading) {
+								buffer.serialize(tc);
+								channel = tc & 0x0f;
+								type = tc & 0xf0;
+							}
+							else {
+								tc = type | channel;
+								buffer.serialize(tc);
+							}
+							buffer.serialize(note);
+							buffer.serialize(velocity);
+						}
+
+					};
+					struct EventData_Tempo {
+						u32 tempo;
+						void serialize(DataBuffer& buffer) {
+							u8 tempo_msb;
+							u16 tempo_lsb;
+							if (buffer.loading) {
+								buffer.serialize(tempo_msb);
+								buffer.serialize(tempo_lsb);
+								tempo = (tempo_msb << 16) | tempo_lsb;
+							}
+							else {
+								tempo_msb = static_cast<u8>((tempo >> 16) & 0xFF);
+								tempo_lsb = static_cast<u16>(tempo & 0xFFFF);
+								buffer.serialize(tempo_msb);
+								buffer.serialize(tempo_lsb);
+								
+							}
+						}
+
+					};
+					struct EventData_TimeSig {
+						u8 numer;
+						u8 denompow2;
+						void serialize(DataBuffer& buffer) {
+							buffer.serialize(numer);
+							u8 denom;
+							if (buffer.loading) {
+								buffer.serialize(denom);
+								denompow2 = log2(denom);
+							}
+							else {
+								denom = pow(2, denompow2);
+								buffer.serialize(denom);
+							}
+							buffer.pos += 1;
+
+						}
+					};
+					struct EventData_Meta {
+						u8 type;
+						u16 string_index;
+						void serialize(DataBuffer& buffer) {
+							buffer.serialize(type);
+							buffer.serialize(string_index);
+							if (type < 1 || type>7) {
+								std::cout <<"INVALID TYPE: " << (int)type << std::endl;
+							}
+						}
+					};
+					std::variant<EventData_Midi,EventData_Tempo,EventData_TimeSig,EventData_Meta> event_data;
+					void serialize(DataBuffer& buffer) {
+						buffer.serialize(tick);
+						buffer.serialize(event_type);
+						if (buffer.loading) {
+							if (event_type == 1) {
+								EventData_Midi edatamidi;
+								buffer.serialize(edatamidi);
+								event_data = std::move(edatamidi);
+							}
+							else if (event_type == 2) {
+								EventData_Tempo edatatempo;
+								buffer.serialize(edatatempo);
+								event_data = std::move(edatatempo);
+							}
+							else if (event_type == 4) {
+								EventData_TimeSig edatatimesig;
+								buffer.serialize(edatatimesig);
+								event_data = std::move(edatatimesig);
+							}
+							else if (event_type == 8) {
+								EventData_Meta edatameta;
+								buffer.serialize(edatameta);
+								event_data = std::move(edatameta);
+							}
+						}
+						else {
+							if (event_type == 1) {
+								buffer.serialize(std::get<EventData_Midi>(event_data));
+							}
+							else if (event_type == 2) {
+								buffer.serialize(std::get<EventData_Tempo>(event_data));
+							}
+							else if (event_type == 4) {
+								buffer.serialize(std::get<EventData_TimeSig>(event_data));
+							}
+							else if (event_type == 8) {
+								buffer.serialize(std::get<EventData_Meta>(event_data));
+							}
+						}
+						
+						
+					}
+				};
+				u8 unk0;
+				i32 unk1;
+				u32 num_events;
+				std::vector<MFREvent> events;
+				u32 num_strings;
+				std::vector<std::string> strings;
+				
+				void serialize(DataBuffer& buffer) {
+					buffer.serialize(unk0);
+					buffer.serialize(unk1);
+					buffer.serialize(num_events);
+					buffer.serializeWithSize(events,num_events);
+					buffer.serialize(num_strings);
+					buffer.serializeWithSize_nonull(strings, num_strings);
+					if (buffer.loading) {
+						int event_idx = 0;
+						for (MFREvent& eventdata : events) {
+							if (eventdata.event_type == 8) {
+								auto& edata = std::get<MFREvent::EventData_Meta>(eventdata.event_data);
+								if (edata.type == 3) {
+									trackname_str_idx == edata.string_index;
+									break;
+								}
+							}
+							event_idx++;
+						}
+					}
+					
+					
+					
+				}
+			};
+			u32 fuser_revision = 1;
+			i32 magic;
+			u32 last_track_final_tick;
+			u32 last_tick;
+			u32 num_tracks;
+			std::vector<MFRTrack> tracks;
+			u32 final_tick_or_rev;
+			u32 final_tick;
+			u32 measures;
+			std::vector<u32> unknown_ints;
+			u32 final_tick_minus_one;
+			std::vector<float> unknown_floats;
+			u32 tempos_len;
+
+			struct Tempo {
+				float start_ms;
+				u32 start_tick;
+				u32 tempo;
+
+				void serialize(DataBuffer& buffer) {
+					buffer.serialize(start_ms);
+					buffer.serialize(start_tick);
+					buffer.serialize(tempo);
+				}
+			};
+
+			std::vector<Tempo> tempos;
+
+			u32 timesigs_len;
+
+			struct TimeSig {
+				i32 measure;
+				u32 tick;
+				i16 numerator;
+				i16 denominator;
+				void serialize(DataBuffer& buffer) {
+					buffer.serialize(measure);
+					buffer.serialize(tick);
+					buffer.serialize(numerator);
+					buffer.serialize(denominator);
+				}
+			};
+
+			std::vector<TimeSig> timesigs;
+			u32 beats_len;
+
+			struct Beat {
+				u32 tick;
+				bool downbeat;
+				void serialize(DataBuffer& buffer) {
+					buffer.serialize(tick);
+					buffer.serialize(downbeat);
+				}
+			};
+
+			std::vector<Beat> beats;
+			u32 unknown_zero;
+			u32 fuser_revision_2 = -1;
+			u32 chords_len;
+
+			struct Chord {
+				std::string name;
+				u32 start;
+				u32 end;
+				void serialize(DataBuffer& buffer) {
+					buffer.serialize_nonull(name);
+					buffer.serialize(start);
+					buffer.serialize(end);
+				}
+			};
+
+			std::vector<Chord> chords;
+			u32 tracknames_len;
+			std::vector<std::string> tracknames;
+
+			void serialize(DataBuffer& buffer) {
+
+				buffer.serialize(magic);
+				buffer.serialize(last_tick);
+				buffer.serialize(num_tracks);
+				buffer.serializeWithSize(tracks, num_tracks);
+				buffer.serialize(final_tick_or_rev);
+				if (final_tick_or_rev == 0x56455223) {
+					buffer.serialize(fuser_revision);
+					buffer.serialize(final_tick);
+				}
+				else {
+					final_tick = final_tick_or_rev;
+				}
+				buffer.serialize(measures);
+				buffer.serializeWithSize(unknown_ints,6);
+				buffer.serialize(final_tick_minus_one);
+				buffer.serializeWithSize(unknown_floats,4);
+				
+				buffer.serialize(tempos_len);
+				buffer.serializeWithSize(tempos, tempos_len);
+				buffer.serialize(timesigs_len);
+				buffer.serializeWithSize(timesigs, timesigs_len);
+				buffer.serialize(beats_len);
+				buffer.serializeWithSize(beats, beats_len);
+
+				buffer.serialize(unknown_zero);
+				if (fuser_revision > 1) {
+					buffer.serialize(fuser_revision_2);
+					buffer.serialize(chords_len);
+					buffer.serializeWithSize(chords,chords_len);
+				}
+				buffer.serialize(tracknames_len);
+				buffer.serializeWithSize_nonull(tracknames, tracknames_len);
+			}
+			void MFRImport(std::string file) {
+				std::ifstream infile(file, std::ios_base::binary);
+
+				std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
+
+				DataBuffer dataBuf;
+				dataBuf.loading = true;
+				dataBuf.setupVector(fileData);
+				serialize(dataBuf);
+			}
+			void MFR_to_midi(std::string file) {
+				std::vector<MidiTrack> midi_tracks;
+				for (MFRTrack& track : tracks) {
+					u32 midi_tick = 0;
+					MidiTrack outTrack;
+					int pbidx = 0;
+					for (MFRTrack::MFREvent& mfrEvent : track.events) {
+						bool doNotSaveEvent = false;
+						TrackEvent outEvent;
+						outEvent.delta_time = mfrEvent.tick - midi_tick;
+
+						midi_tick = mfrEvent.tick;
+						if (mfrEvent.event_type == 1) { //MIDI
+							MidiEvent outMidiEvent;
+							MFRTrack::MFREvent::EventData_Midi outData = std::get<MFRTrack::MFREvent::EventData_Midi>(mfrEvent.event_data);
+							outMidiEvent.channel = outData.channel;
+							outEvent.type = (EventType)outData.type;
+							if (outData.type == (u8)EventType::NoteOff || outData.type == (u8)EventType::NoteOn) {
+								outMidiEvent.note.key = outData.note;
+								outMidiEvent.note.velocity = outData.velocity;
+							}
+							else if (outData.type == (u8)EventType::Controller) {
+								outMidiEvent.controller.controller = outData.note;
+								outMidiEvent.controller.value = outData.velocity;
+							}
+							else if (outData.type == (u8)EventType::ProgramChange) {
+								outMidiEvent.program = outData.note;
+							}
+							else if (outData.type == (u8)EventType::ChannelPressure) {
+								outMidiEvent.pressure = outData.note;
+							}
+							else if (outData.type == (u8)EventType::PitchBend) {
+								outMidiEvent.bend = (u16)((outData.note<<8) | outData.velocity );
+								std::cout << "PBOUT " << pbidx <<": " << outMidiEvent.bend<<", (" << (int)outData.note << ", " << (int)outData.velocity <<")"<< std::endl;
+								pbidx++;
+							}
+							else {
+								doNotSaveEvent = true;
+							}
+							if (!doNotSaveEvent) {
+								outEvent.inner_event = std::move(outMidiEvent);
+							}
+							
+
+						}
+						else if (mfrEvent.event_type == 2) { //TEMPO
+							outEvent.type = EventType::Meta;
+							MFRTrack::MFREvent::EventData_Tempo outData = std::get<MFRTrack::MFREvent::EventData_Tempo>(mfrEvent.event_data);
+							MetaEvent outMetaEvent = MetaEvent(MetaEventType::TempoEvent,outData.tempo);
+							outEvent.inner_event = std::move(outMetaEvent);
+						}
+						else if (mfrEvent.event_type == 4) { //TIMESIG
+							outEvent.type = EventType::Meta;
+							MFRTrack::MFREvent::EventData_TimeSig outData = std::get<MFRTrack::MFREvent::EventData_TimeSig>(mfrEvent.event_data);
+							MetaEvent outMetaEvent = MetaEvent(MetaEventType::TimeSignature, TimeSignatureEvent{outData.numer, outData.denompow2, 24, 8});
+							outEvent.inner_event = std::move(outMetaEvent);
+						}
+						else if (mfrEvent.event_type == 8) { //META
+							outEvent.type = EventType::Meta;
+							MFRTrack::MFREvent::EventData_Meta outData = std::get<MFRTrack::MFREvent::EventData_Meta>(mfrEvent.event_data);
+							if ((MetaEventType)outData.type == MetaEventType::TrackName) {
+								outTrack.name = track.strings[outData.string_index];
+							}
+							MetaEvent outMetaEvent = MetaEvent((MetaEventType)outData.type, track.strings[outData.string_index]);
+							outEvent.inner_event = std::move(outMetaEvent);
+							
+						}
+						if (!doNotSaveEvent) {
+							outTrack.events.emplace_back(outEvent);
+						}
+						
+					}
+					outTrack.events.emplace_back(TrackEvent{ 0,EventType::Meta,MetaEvent(MetaEventType::EndOfTrack) });
+					midi_tracks.emplace_back(outTrack);
+				}
+				MidiFile outMidi(MidiFormat::MultiTrack, midi_tracks, 480);
+				std::ofstream outfile(file, std::ios_base::binary);
+				outMidi.WriteMidi(outfile);
+				outfile.close();
+			}
+			
+			void MFR_from_midi(std::string file) {
+				MidiFile inMidi = MidiFile::ReadMidi (std::ifstream(file, std::ios_base::binary));
+				if (inMidi.ticks_per_qn() != 480) {
+					magic = 480;
+				}
+				magic = 2;
+				
+				last_track_final_tick = (u32)inMidi.tracks().back().total_ticks;
+				u32 new_final_tick = 0;
+				for (const auto& track : inMidi.tracks()) {
+					MFRTrack newTrack;
+					newTrack.unk0 = 1;
+					newTrack.unk1 = track.name == "samplemidi" ? 0 : -1;
+					u32 absolute_tick = 0;
+					int pbidx = 0;
+					for (auto& event : track.events) {
+						bool doNotAddEvent = false;
+						MFRTrack::MFREvent mfrEvent;
+						absolute_tick += event.delta_time;
+						mfrEvent.tick = absolute_tick;
+						if (event.type == EventType::Meta) {
+							auto meta = std::get<MetaEvent>(event.inner_event);
+							if (meta.type == MetaEventType::TempoEvent) {
+								MFRTrack::MFREvent::EventData_Tempo tempoEvent;
+								tempoEvent.tempo = std::get<u32>(meta.event);
+								mfrEvent.event_data = std::move(tempoEvent);
+								mfrEvent.event_type = 2;
+							}else if (meta.type == MetaEventType::TimeSignature) {
+								MFRTrack::MFREvent::EventData_TimeSig timeSigEvent;
+								TimeSignatureEvent& mts= std::get<TimeSignatureEvent>(meta.event);
+								timeSigEvent.numer = mts.numerator;
+								timeSigEvent.denompow2 = mts.denominator;
+								mfrEvent.event_data = std::move(timeSigEvent);
+								mfrEvent.event_type = 4;
+							}
+							else {
+								MFRTrack::MFREvent::EventData_Meta metaEvent;
+								metaEvent.type = (u8)meta.type;
+								if (metaEvent.type < 1 || metaEvent.type>7) {
+									doNotAddEvent = true;
+								}
+								else {
+									std::string metaStr = std::get<std::string>(meta.event);
+									if (newTrack.strings.size() > 0) {
+										int stridx = 0;
+										for (std::string str : newTrack.strings) {
+											if (str == metaStr) {
+												metaEvent.string_index = stridx;
+												continue;
+											}
+											stridx++;
+										}
+										if (stridx > newTrack.strings.size()-1) {
+											newTrack.strings.emplace_back(metaStr);
+											metaEvent.string_index = stridx;
+										}
+									}
+									else {
+										newTrack.strings.emplace_back(metaStr);
+										metaEvent.string_index = 0;
+									}
+								}
+								if (meta.type == MetaEventType::TrackName) {
+									newTrack.trackname_str_idx = metaEvent.string_index;
+								}
+								mfrEvent.event_data = std::move(metaEvent);
+								mfrEvent.event_type = 8;
+
+							}
+						}
+						else if (event.type == EventType::Sysex || event.type == EventType::SysexRaw) {
+							std::cout << "sysex" << std::endl;
+						}
+						else {
+							MFRTrack::MFREvent::EventData_Midi mfrMidi;
+							mfrEvent.event_type = 1;
+							mfrMidi.type = (u8)event.type;
+							if (event.type == EventType::NoteOn || event.type == EventType::NoteOff) {
+								MidiEvent mEvent = std::get<MidiEvent>(event.inner_event);
+								mfrMidi.channel = mEvent.channel;
+								mfrMidi.note = mEvent.note.key;
+								mfrMidi.velocity = mEvent.note.velocity;
+							}
+							else if (event.type == EventType::Controller) {
+								MidiEvent mEvent = std::get<MidiEvent>(event.inner_event);
+								mfrMidi.channel = mEvent.channel;
+								mfrMidi.note = mEvent.controller.controller;
+								mfrMidi.velocity = mEvent.controller.value;	
+							}
+							else if (event.type == EventType::ProgramChange) {
+								MidiEvent mEvent = std::get<MidiEvent>(event.inner_event);
+								mfrMidi.channel = mEvent.channel;
+								mfrMidi.note = mEvent.program;
+								mfrMidi.velocity = 0;
+							}
+							else if (event.type == EventType::ChannelPressure) {
+								MidiEvent mEvent = std::get<MidiEvent>(event.inner_event);
+								mfrMidi.channel = mEvent.channel;
+								mfrMidi.note = mEvent.pressure;
+								mfrMidi.velocity = 0;
+							}
+							else if (event.type == EventType::PitchBend) {
+								MidiEvent mEvent = std::get<MidiEvent>(event.inner_event);
+								mfrMidi.channel = mEvent.channel;
+								u16 tempBend = mEvent.bend;
+								mfrMidi.note = (mEvent.bend >> 8) & 0x7F;
+								mfrMidi.velocity = mEvent.bend & 0x7F;
+								std::cout << "PBIN " << pbidx << ": " << mEvent.bend << ", (" << (int)mfrMidi.note << ", " << (int)mfrMidi.velocity << ")" << std::endl;
+								pbidx++;
+							}
+							else {
+								doNotAddEvent = true;
+							}
+							mfrEvent.event_data = std::move(mfrMidi);
+
+						}
+						if (!doNotAddEvent) {
+							newTrack.events.emplace_back(mfrEvent);
+						}
+					}
+					newTrack.num_events = newTrack.events.size();
+					newTrack.num_strings = newTrack.strings.size();
+					tracks.push_back(newTrack);
+					tracknames.push_back(newTrack.strings[newTrack.trackname_str_idx]);
+					if (track.total_ticks > new_final_tick)
+						new_final_tick = (u32)track.total_ticks;
+					if (track.name == "chords") {
+						u32 current_tick = 0;
+						for (auto& event : track.events) {
+							current_tick += event.delta_time;
+							if (event.type != EventType::Meta) continue;
+							auto meta = std::get<MetaEvent>(event.inner_event);
+							if (meta.type == MetaEventType::Text) {
+								if (chords.size() > 0) {
+									chords.back().end = current_tick - 1;
+								}
+								Chord newchord;
+								newchord.name = std::get<std::string>(meta.event);
+								newchord.start = current_tick;
+								newchord.end = -1;
+								chords.emplace_back(newchord);
+							}
+						}
+					}
+				}
+				num_tracks = tracks.size();
+				std::vector<uint32_t> measure_ticks;
+				measure_ticks.push_back(0);
+				auto last_time_sig = inMidi.tempo_timesig_map()[0];
+				int measure = 0;
+				for (auto& tempo : inMidi.tempo_timesig_map())
+				{
+					if (tempo.new_tempo) {
+						Tempo curTempo;
+						curTempo.start_ms = (float)(tempo.time * 1000.0);
+						curTempo.start_tick = (u32)tempo.tick;
+						curTempo.tempo = (i32)(60000000 / (float)tempo.bpm);
+						tempos.emplace_back(curTempo);
+					}
+						
+					if (tempo.new_time_sig)
+					{
+						if (tempo.tick > 0)
+						{
+							auto elapsed = tempo.tick - last_time_sig.tick;
+							auto ticksPerBeat = (480 * 4) / last_time_sig.denominator;
+							measure += (int)(elapsed / ticksPerBeat / last_time_sig.numerator);
+							auto last_measure_tick = measure_ticks.back();
+							for (int i = measure_ticks.size(); i < measure; i++)
+							{
+								last_measure_tick += 480 * last_time_sig.numerator * 4 / last_time_sig.denominator;
+								measure_ticks.push_back(last_measure_tick);
+							}
+						}
+						TimeSig timesig;
+						timesig.measure = measure;
+						timesig.tick = (u32)tempo.tick;
+						timesig.numerator = tempo.numerator;
+						timesig.denominator = tempo.denominator;
+						timesigs.emplace_back(timesig);
+						last_time_sig = tempo;
+					}
+				};
+				uint32_t last_timesig_ticks_per_measure = 480 * last_time_sig.numerator * 4 / last_time_sig.denominator;
+				for (uint32_t last_measure_tick2 = measure_ticks.back() + last_timesig_ticks_per_measure;
+					last_measure_tick2 < new_final_tick;
+					last_measure_tick2 += last_timesig_ticks_per_measure) {
+					measure_ticks.push_back(last_measure_tick2);
+				}
+
+				final_tick_or_rev = 0x56455223;
+				fuser_revision = 2;
+				measures = measure_ticks.size();
+				final_tick = new_final_tick;
+				unknown_ints = { 0, 0, 0, 0, 0, 0 };
+				final_tick_minus_one = final_tick - 1;
+				unknown_floats = { -1.f, -1.f, -1.f, -1.f };
+				unknown_zero = 0;
+				last_tick = final_tick;
+				fuser_revision_2 = chords.size() == 0 ? -1 : 2;
+				// BEATS would go here, but Fuser doesn't have beats?
+				// song sections would go here, but fuser doesn't have song sections?
+				tempos_len = tempos.size();
+				timesigs_len = timesigs.size();
+				beats_len = beats.size();
+				tracknames_len = tracknames.size();
+				chords_len = chords.size();
+			}
+		};
+
 		struct FusionFileResource {
 			hmx_fusion_nodes nodes;
 
@@ -940,7 +1505,7 @@ struct HmxAudio {
 			}
 		};
 
-		std::variant<std::monostate, MoggSampleResourceHeader, MidiMusicResource, FusionFileResource> resourceHeader;
+		std::variant<std::monostate, MoggSampleResourceHeader, MidiMusicResource, FusionFileResource, MidiFileResource> resourceHeader;
 		std::vector<u8> fileData;
 
 
@@ -967,6 +1532,11 @@ struct HmxAudio {
 					FusionFileResource resource;
 					buffer.serializeWithSize(fileData, totalSize);
 					resource.nodes = hmx_fusion_parser::parseData(fileData);
+					resourceHeader = std::move(resource);
+				}
+				else if (fileType == "MidiFileResource") {
+					MidiFileResource resource;
+					buffer.serialize(resource);
 					resourceHeader = std::move(resource);
 				}
 				else {

@@ -120,7 +120,7 @@ int __stdcall WinMain(
     ImFont* fontcsc = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f,&config,io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
     ImFont* fontctr = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msjh.ttc", 16.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
     ImFont* fontkor = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\malgun.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesKorean());
-    ImFont* fontjpn = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\Simhei.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesJapanese());
+    ImFont* fontjpn = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\YuGothR.ttc", 16.0f, &config, io.Fonts->GetGlyphRangesJapanese());
     if(font0!=NULL && fontcsc!=NULL && fontctr!=NULL && fontkor!=NULL && fontjpn!=NULL)
         io.Fonts->Build();
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
