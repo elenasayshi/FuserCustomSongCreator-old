@@ -322,7 +322,6 @@ struct MainContext {
 };
 MainContext gCtx;
 
-bool funny = true;
 
 void load_file(DataBuffer&& dataBuf) {
 	gCtx.has_art = false;
@@ -420,7 +419,7 @@ void load_file(DataBuffer&& dataBuf) {
 			celShortName.emplace_back(cel.data.shortName);
 			auto&& fusionFile = cel.data.majorAssets[0].data.fusionFile.data;
 			auto&& asset = std::get<HmxAssetFile>(fusionFile.file.e->getData().data.catagoryValues[0].value);
-			auto &&mogg = asset.audio.audioFiles[0];
+			auto&& mogg = asset.audio.audioFiles[0];
 
 			HmxAudio::PackageFile fusionPackageFile;
 			std::vector<HmxAudio::PackageFile> moggFiles;
@@ -458,7 +457,7 @@ void load_file(DataBuffer&& dataBuf) {
 			cel.data.shortName = celShortName[idx];
 			auto&& fusionFile = cel.data.majorAssets[0].data.fusionFile.data;
 			auto&& asset = std::get<HmxAssetFile>(fusionFile.file.e->getData().data.catagoryValues[0].value);
-			auto &&mogg = asset.audio.audioFiles[0];
+			auto&& mogg = asset.audio.audioFiles[0];
 
 			cel.data.instrument = instrumentTypes[idx];
 			HmxAudio::PackageFile* fusionPackageFile = nullptr;
@@ -563,7 +562,7 @@ void save_file() {
 bool Error_InvalidFileName = false;
 void select_save_location() {
 	auto fileName = gCtx.currentPak->root.shortName + "_P.pak";
-	auto location = SaveFile("Fuser Custom Song (*.pak)\0*.pak\0","pak", fileName);
+	auto location = SaveFile("Fuser Custom Song (*.pak)\0*.pak\0", "pak", fileName);
 	if (location) {
 		auto path = fs::path(*location);
 		auto savedFileName = path.stem().string() + path.extension().string();
@@ -910,7 +909,7 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		ImGui::SameLine();
 		HelpMarker("The volume of the keyzone. 0 means it's the same volume as the imported audio, negative values make it quieter, positive values make it louder. This is relative to the gain for the disc/riser.");
 
-		ImGui::SameLine(); 
+		ImGui::SameLine();
 		float& kzpan = keyzone->getNode("pan").getFloat("position");
 		if (kzpan < -1)
 			kzpan = -1;
@@ -1228,8 +1227,8 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 					return &p == selectedRemove;
 				}
 			);
-			asset.audio.audioFiles.erase(it);
 			int audioIndex = std::distance(asset.audio.audioFiles.begin(), it);
+			asset.audio.audioFiles.erase(it);
 			fusionFile.playableMoggs.erase(fusionFile.playableMoggs.begin() + audioIndex);
 			moggFiles.clear();
 			for (auto&& file : asset.audio.audioFiles) {
@@ -1456,6 +1455,8 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 
 
 	bool disc_advanced;
+	int disc_midi_maj_single;
+	int disc_midi_min_single;
 	{
 		for (auto&& file : asset.audio.audioFiles) {
 			if (file.fileType == "FusionPatchResource") {
@@ -1479,6 +1480,51 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 		}
 		else {
 			disc_advanced = fusion.nodes.getInt("edit_advanced") == 1;
+		}
+
+		if (fusion.nodes.getChild("midi_isonenote_maj") == nullptr) {
+
+			hmx_fusion_node node;
+			node.key = "midi_isonenote_maj";
+			AssetLink<MidiSongAsset>* midiSong = &celData.majorAssets[0];
+			auto&& midi_file = midiSong->data.midiFile.data;
+			auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
+			int isSingleNote = mfr.MFR_is_single_note();
+			std::cout << celData.shortName << ": " << isSingleNote << std::endl;
+			if (isSingleNote < 2) {
+				node.value = isSingleNote;
+				disc_midi_maj_single = isSingleNote;
+			}
+			else {
+				node.value = 0;
+				disc_midi_min_single = 0;
+			}
+			fusion.nodes.children.insert(fusion.nodes.children.begin(), node);
+		}
+		else {
+			disc_midi_maj_single = fusion.nodes.getInt("midi_isonenote_maj");
+		}
+
+		if (fusion.nodes.getChild("midi_isonenote_min") == nullptr) {
+			hmx_fusion_node node;
+			node.key = "midi_isonenote_min";
+			AssetLink<MidiSongAsset>* midiSong = &celData.minorAssets[0];
+			auto&& midi_file = midiSong->data.midiFile.data;
+			auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
+			int isSingleNote = mfr.MFR_is_single_note();
+			std::cout << celData.shortName << ": " << isSingleNote << std::endl;
+			if (isSingleNote < 2) {
+				node.value = isSingleNote;
+				disc_midi_min_single = isSingleNote;
+			}
+			else {
+				node.value = 0;
+				disc_midi_min_single = 0;
+			}
+			fusion.nodes.children.insert(fusion.nodes.children.begin() + 1, node);
+		}
+		else {
+			disc_midi_min_single = fusion.nodes.getInt("midi_isonenote_min");
 		}
 
 		int mapidx = 0;
@@ -1584,6 +1630,7 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 		else {
 			rise_advanced = fusionRiser.nodes.getInt("edit_advanced") == 1;
 		}
+
 		int mapidx = 0;
 		for (auto c : mapRiser.children) {
 			auto nodesRiser = std::get<hmx_fusion_nodes*>(c.value);
@@ -1700,10 +1747,10 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 			bool overwrite_midi = false;
 			bool maj = true;
 
-			if (ImGui::Button("Overwrite Disc Major Midi File")) {
+			if (ImGui::Button("Overwrite Disc Major MIDI File")) {
 				overwrite_midi = true;
 			}
-			else if (ImGui::Button("Overwrite Disc Minor Midi File")) {
+			else if (ImGui::Button("Overwrite Disc Minor MIDI File")) {
 				overwrite_midi = true;
 				maj = false;
 			}
@@ -1733,26 +1780,54 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 						}
 
 						if (mfr.magic == 2) {
+							{
+								for (auto&& file : asset.audio.audioFiles) {
+									if (file.fileType == "FusionPatchResource") {
+										fusionPackageFile = &file;
+									}
+									else if (file.fileType == "MoggSampleResource") {
+										moggFiles.emplace_back(&file);
+									}
+								}
+
+								auto&& fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionPackageFile->resourceHeader);
+								int isSingleNote = mfr.MFR_is_single_note();
+								if (maj) {
+									if (isSingleNote < 2) {
+										fusion.nodes.getInt("midi_isonenote_maj") = isSingleNote;
+									}
+									else {
+										fusion.nodes.getInt("midi_isonenote_maj") = 0;
+									}
+								}else {
+									if (isSingleNote < 2) {
+										fusion.nodes.getInt("midi_isonenote_min") = isSingleNote;
+									}
+									else {
+										fusion.nodes.getInt("midi_isonenote_min") = 0;
+									}
+								}
+							}
 							midiAsset.audio.audioFiles[0].resourceHeader = std::move(mfr);
 						}
-						
+
 					}
 				}
 				catch (const std::exception& ex) {
 					ErrorModal("Overwrite MIDI Failed", ex.what());
 				}
-				
+
 			}
 
 			ImGui::Spacing();
 
 			bool export_midi = false;
 
-			if (ImGui::Button("Export Disc Major Midi File")) {
+			if (ImGui::Button("Export Disc Major MIDI File")) {
 				export_midi = true;
 				maj = true;
 			}
-			else if (ImGui::Button("Export Disc Minor Midi File")) {
+			else if (ImGui::Button("Export Disc Minor MIDI File")) {
 				export_midi = true;
 				maj = false;
 			}
@@ -1779,14 +1854,19 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 					ErrorModal("Save MIDI Failed", ex.what());
 				}
 			}
+			bool tickLengthAdvanced = celData.tickLengthAdvanced;
+			
+			if (disc_midi_maj_single == 0) {
+				ImGui::TextWrapped("WARNING: Major MIDI will not automatically update length");
+			}if (disc_midi_min_single == 0) {
+				ImGui::TextWrapped("WARNING: Minor MIDI will not automatically update length");
+			}
 			if (disc_advanced) {
 				ImGui::Checkbox("Advanced Length Input", &celData.tickLengthAdvanced);
 				ImGui::SameLine();
 				HelpMarker("Will allow the length in ticks for the custom to loop to be set to any value. Calculate using the formula \"Length = 480 * beats\". Default is 61440, which is the length of 32 bars in midi ticks.");
-
-
 			}
-			if (celData.tickLengthAdvanced) {
+			if (tickLengthAdvanced) {
 				ImGui::InputInt("Tick Length", &celData.tickLength, 0, 0);
 			}
 			else {
@@ -1811,286 +1891,327 @@ void display_cell_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMo
 					}
 					ImGui::EndCombo();
 				}
-				auto pickupTableSize = ImGui::GetContentRegionAvail().y;
-				ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170));
-				if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170))) {
-					ImGui::TableSetupColumn("Index", 0, 0.2);
-					ImGui::TableSetupColumn("Pickup Beat");
-					ImGui::TableHeadersRow();
-					if (celData.pickupArray->values.size() > 0) {
-						for (int i = 0; i < celData.pickupArray->values.size(); i++)
-						{
-							ImGui::TableNextRow();
-							ImGui::TableNextColumn();
-							if (ImGui::Selectable((std::to_string(i)).c_str(), curPickup == i, ImGuiSelectableFlags_SpanAllColumns)) {
-								curPickup = i;
-								pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data;
-							}
-							ImGui::TableNextColumn();
-							std::string pickupPos = std::to_string(std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data);
-							pickupPos = pickupPos.substr(0, pickupPos.find(".") + 3);
-							ImGui::Text(pickupPos.c_str());
-						}
-					}
-
-					ImGui::EndTable();
-				}
-				ImGui::EndChild();
-				ImGui::BeginChild("PickupButtons", ImVec2(windowSize.x / 3, 145));
-				if (ImGui::InputFloat("Pickup Beat", &pickupInput, 0.0F, 0.0F, "%.2f")) {
-					pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
-				}
-				if (ImGui::Button("Add Pickup")) {
-					pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
-
-					if (celData.pickupArray->values.size() > 0) {
-						std::vector<float> pickups;
-
-						for (auto puv : celData.pickupArray->values) {
-							pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
-						}
-
-						auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
-
-						if (it == pickups.end()) {
-							pickups.emplace_back(pickupInput);
-							std::sort(pickups.begin(), pickups.end());
-							auto last = std::unique(pickups.begin(), pickups.end());
-							pickups.erase(last, pickups.end());
-							celData.pickupArray->values.clear();
-							for (int i = 0; i < pickups.size(); i++) {
-								celData.pickupArray->values.emplace_back(new IPropertyValue);
-								celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
-								std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
-							}
-							auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
-							if (it2 != pickups.end()) {
-								curPickup = std::distance(pickups.begin(), it2);
-							}
-						}
-					}
-					else {
-						celData.pickupArray->values.emplace_back(new IPropertyValue);
-						celData.pickupArray->values[0]->v = asset_helper::createPropertyValue("FloatProperty");
-						std::get<PrimitiveProperty<float>>(celData.pickupArray->values[0]->v).data = pickupInput;
-						curPickup = 0;
-					}
-
-
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Update Pickup") && celData.pickupArray->values.size() > 0) {
-					pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
-					if (celData.pickupArray->values.size() == 1) {
-						std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data = pickupInput;
-					}
-					else {
-						std::vector<float> pickups;
-						for (auto puv : celData.pickupArray->values) {
-							pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
-						}
-
-						auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
-						if (it == pickups.end()) {
-							pickups[curPickup] = pickupInput;
-							std::sort(pickups.begin(), pickups.end());
-							auto last = std::unique(pickups.begin(), pickups.end());
-							pickups.erase(last, pickups.end());
-							celData.pickupArray->values.clear();
-							for (int i = 0; i < pickups.size(); i++) {
-								celData.pickupArray->values.emplace_back(new IPropertyValue);
-								celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
-								std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
-							}
-							auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
-							if (it2 != pickups.end()) {
-								curPickup = std::distance(pickups.begin(), it2);
-							}
-						}
-					}
-
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Remove Pickup") && celData.pickupArray->values.size() > 0) {
-					int pickupToErase = curPickup;
-					if (curPickup == celData.pickupArray->values.size() - 1) {
-						curPickup--;
-					}
-					celData.pickupArray->values.erase(celData.pickupArray->values.begin() + pickupToErase);
-					if (celData.pickupArray->values.size() > 0) {
-						pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data;
-					}
-
-				}
-				ImGui::NewLine();
-				ImGui::NewLine();
-				if (ImGui::Button("Clear Pickups")) {
-					ImGui::OpenPopup("Clear Pickups?");
-				}
-
-				ImGui::PopStyleColor();
-				if (ImGui::BeginPopupModal("Clear Pickups?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-				{
-					ImGui::BeginChild("Text", ImVec2(420, 69));
-					ImGui::Text("Are you sure you would like to clear pickups?");
-					ImGui::TextWrapped("WARNING: Will erase all pickups");
-					ImGui::EndChild();
-					ImGui::BeginChild("Buttons", ImVec2(420, 25));
-					if (ImGui::Button("Yes", ImVec2(120, 0)))
-					{
-						celData.pickupArray->values.clear();
-						curPickup = -1;
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::SameLine();
-					if (ImGui::Button("No", ImVec2(120, 0)))
-					{
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::EndChild();
-
-
-					ImGui::EndPopup();
-				}
-
-				ImGui::EndChild();
-
-
-				ImGui::EndChild();
-				ImGui::EndTabItem();
 			}
-		}
-		if (ImGui::BeginTabItem("Riser Audio")) {
-			ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize), true);
-			display_cel_audio_options(celData, assetRiser, moggFilesRiser, fusionFileRiser, fusionPackageFileRiser, duplicate_moggsRiser, true);
+			if (ImGui::Button("Update MIDI length")) {
+				if (disc_midi_maj_single == 1) {
+					AssetLink<MidiSongAsset>& midiSong = celData.majorAssets[0];
+					auto&& midi_file = midiSong.data.midiFile.data;
+					auto&& midiAsset = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
+					midiAsset.final_tick = celData.tickLength;
+					midiAsset.final_tick_minus_one = celData.tickLength - 1;
+					midiAsset.last_track_final_tick = celData.tickLength;
+					for (auto& track : midiAsset.tracks) {
+						if (track.strings[track.trackname_str_idx] == "samplemidi") {
+							int midi_idx = 0;
+							for (auto& mfrevent : track.events) {
+								if (mfrevent.event_type == 1) {
+									if (midi_idx == 1) {
+										mfrevent.tick = celData.tickLength;
+									}
+									midi_idx++;
+								}
+							}
+						}
+					}
+				}
+				if (disc_midi_min_single == 1) {
+					AssetLink<MidiSongAsset>& midiSong = celData.minorAssets[0];
+					auto&& midi_file = midiSong.data.midiFile.data;
+					auto&& midiAsset = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
+					midiAsset.final_tick = celData.tickLength;
+					midiAsset.final_tick_minus_one = celData.tickLength - 1;
+					midiAsset.last_track_final_tick = celData.tickLength;
+					for (auto& track : midiAsset.tracks) {
+						if (track.strings[track.trackname_str_idx] == "samplemidi") {
+							int midi_idx = 0;
+							for (auto& mfrevent : track.events) {
+								if (mfrevent.event_type == 1) {
+									if (midi_idx == 1) {
+										mfrevent.tick = celData.tickLength - 1;
+									}
+									midi_idx++;
+								}
+							}
+						}
+					}
+				}
+			}
+			auto pickupTableSize = ImGui::GetContentRegionAvail().y;
+			ImGui::BeginChild("PickupTableHolder", ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170));
+			if (ImGui::BeginTable("PickupTable", 2, 0, ImVec2((windowSize.x / 3) - 15, ImGui::GetContentRegionAvail().y - 170))) {
+				ImGui::TableSetupColumn("Index", 0, 0.2);
+				ImGui::TableSetupColumn("Pickup Beat");
+				ImGui::TableHeadersRow();
+				if (celData.pickupArray->values.size() > 0) {
+					for (int i = 0; i < celData.pickupArray->values.size(); i++)
+					{
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						if (ImGui::Selectable((std::to_string(i)).c_str(), curPickup == i, ImGuiSelectableFlags_SpanAllColumns)) {
+							curPickup = i;
+							pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data;
+						}
+						ImGui::TableNextColumn();
+						std::string pickupPos = std::to_string(std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data);
+						pickupPos = pickupPos.substr(0, pickupPos.find(".") + 3);
+						ImGui::Text(pickupPos.c_str());
+					}
+				}
+
+				ImGui::EndTable();
+			}
 			ImGui::EndChild();
+			ImGui::BeginChild("PickupButtons", ImVec2(windowSize.x / 3, 145));
+			if (ImGui::InputFloat("Pickup Beat", &pickupInput, 0.0F, 0.0F, "%.2f")) {
+				pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
+			}
+			if (ImGui::Button("Add Pickup")) {
+				pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
+
+				if (celData.pickupArray->values.size() > 0) {
+					std::vector<float> pickups;
+
+					for (auto puv : celData.pickupArray->values) {
+						pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
+					}
+
+					auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
+
+					if (it == pickups.end()) {
+						pickups.emplace_back(pickupInput);
+						std::sort(pickups.begin(), pickups.end());
+						auto last = std::unique(pickups.begin(), pickups.end());
+						pickups.erase(last, pickups.end());
+						celData.pickupArray->values.clear();
+						for (int i = 0; i < pickups.size(); i++) {
+							celData.pickupArray->values.emplace_back(new IPropertyValue);
+							celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
+							std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
+						}
+						auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
+						if (it2 != pickups.end()) {
+							curPickup = std::distance(pickups.begin(), it2);
+						}
+					}
+				}
+				else {
+					celData.pickupArray->values.emplace_back(new IPropertyValue);
+					celData.pickupArray->values[0]->v = asset_helper::createPropertyValue("FloatProperty");
+					std::get<PrimitiveProperty<float>>(celData.pickupArray->values[0]->v).data = pickupInput;
+					curPickup = 0;
+				}
+
+
+			}
 			ImGui::SameLine();
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
-			ImGui::BeginChild("Advanced - Riser", ImVec2(ImGui::GetContentRegionAvail().x, oggWindowSize), true);
-			if (ImGui::Button("Export Riser Fusion File")) {
-				auto file = SaveFile("Fusion Text File (.fusion)\0*.fusion\0", "fusion", "");
-				if (file) {
-					for (auto&& f : assetRiser.audio.audioFiles) {
-						if (f.fileType == "FusionPatchResource") {
+			if (ImGui::Button("Update Pickup") && celData.pickupArray->values.size() > 0) {
+				pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
+				if (celData.pickupArray->values.size() == 1) {
+					std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data = pickupInput;
+				}
+				else {
+					std::vector<float> pickups;
+					for (auto puv : celData.pickupArray->values) {
+						pickups.emplace_back(std::get<PrimitiveProperty<float>>(puv->v).data);
+					}
 
-							std::ofstream outFile(*file);
-							std::string outStr = hmx_fusion_parser::outputData(std::get<HmxAudio::PackageFile::FusionFileResource>(f.resourceHeader).nodes);
-							outFile << outStr;
-
-							break;
+					auto it = std::find(pickups.begin(), pickups.end(), pickupInput);
+					if (it == pickups.end()) {
+						pickups[curPickup] = pickupInput;
+						std::sort(pickups.begin(), pickups.end());
+						auto last = std::unique(pickups.begin(), pickups.end());
+						pickups.erase(last, pickups.end());
+						celData.pickupArray->values.clear();
+						for (int i = 0; i < pickups.size(); i++) {
+							celData.pickupArray->values.emplace_back(new IPropertyValue);
+							celData.pickupArray->values[i]->v = asset_helper::createPropertyValue("FloatProperty");
+							std::get<PrimitiveProperty<float>>(celData.pickupArray->values[i]->v).data = pickups[i];
+						}
+						auto it2 = std::find(pickups.begin(), pickups.end(), pickupInput);
+						if (it2 != pickups.end()) {
+							curPickup = std::distance(pickups.begin(), it2);
 						}
 					}
 				}
+
 			}
-
-			if (ImGui::Button("Import Riser Fusion File")) {
-				auto file = OpenFile("Fusion Text File (.fusion)\0*.fusion\0");
-				if (file) {
-					for (auto&& f : assetRiser.audio.audioFiles) {
-						if (f.fileType == "FusionPatchResource") {
-
-							std::ifstream infile(*file, std::ios_base::binary);
-							std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
-							std::get<HmxAudio::PackageFile::FusionFileResource>(f.resourceHeader).nodes = hmx_fusion_parser::parseData(fileData);
-
-							break;
-						}
-					}
+			ImGui::SameLine();
+			if (ImGui::Button("Remove Pickup") && celData.pickupArray->values.size() > 0) {
+				int pickupToErase = curPickup;
+				if (curPickup == celData.pickupArray->values.size() - 1) {
+					curPickup--;
 				}
-			}
-
-			ImGui::Spacing();
-
-			bool overwrite_midiRiser = false;
-			bool majRiser = true;
-
-			if (ImGui::Button("Overwrite Riser Major Midi File")) {
-				overwrite_midiRiser = true;
-			}
-			else if (ImGui::Button("Overwrite Riser Minor Midi File")) {
-				overwrite_midiRiser = true;
-				majRiser = false;
-			}
-
-			if (overwrite_midiRiser) {
-				try {
-					auto file = OpenFile("MIDI File (.mid)\0*.mid\0");
-					if (file) {
-						AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
-						if (majRiser) {
-							midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
-						}
-						else {
-							midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
-						}
-
-						auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
-						auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
-
-						HmxAudio::PackageFile::MidiFileResource mfr;
-
-						if (endsWith(*file, ".mid")) {
-							mfr.MFR_from_midi(*file);
-						}
-						else if (endsWith(*file, ".mid_pc")) {
-							mfr.MFRImport(*file);
-						}
-
-						if (mfr.magic == 2) {
-							midiAssetRiser.audio.audioFiles[0].resourceHeader = std::move(mfr);
-						}
-					}
+				celData.pickupArray->values.erase(celData.pickupArray->values.begin() + pickupToErase);
+				if (celData.pickupArray->values.size() > 0) {
+					pickupInput = std::get<PrimitiveProperty<float>>(celData.pickupArray->values[curPickup]->v).data;
 				}
-				catch (const std::exception& ex) {
-					ErrorModal("Overwrite MIDI Failed", ex.what());
-				}
+
+			}
+			ImGui::NewLine();
+			ImGui::NewLine();
+			if (ImGui::Button("Clear Pickups")) {
+				ImGui::OpenPopup("Clear Pickups?");
 			}
 
-			ImGui::Spacing();
-
-
-			bool export_midiRiser = false;
-
-			if (ImGui::Button("Export Riser Major Midi File")) {
-				export_midiRiser = true;
-				majRiser = true;
-			}
-			else if (ImGui::Button("Export Riser Minor Midi File")) {
-				export_midiRiser = true;
-				majRiser = false;
-			}
-
-			if (export_midiRiser) {
-				try {
-					auto file = SaveFile("MIDI (.mid)\0*.mid\0", "mid", "");
-					if (file) {
-						AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
-						if (majRiser) {
-							midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
-						}
-						else {
-							midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
-						}
-
-						auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
-						auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
-						std::get<HmxAudio::PackageFile::MidiFileResource>(midiAssetRiser.audio.audioFiles[0].resourceHeader).MFR_to_midi(*file);
-					}
-				}
-				catch (const std::exception& ex) {
-					ErrorModal("Save MIDI Failed", ex.what());
-				}
-				
-			}
 			ImGui::PopStyleColor();
+			if (ImGui::BeginPopupModal("Clear Pickups?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+			{
+				ImGui::BeginChild("Text", ImVec2(420, 69));
+				ImGui::Text("Are you sure you would like to clear pickups?");
+				ImGui::TextWrapped("WARNING: Will erase all pickups");
+				ImGui::EndChild();
+				ImGui::BeginChild("Buttons", ImVec2(420, 25));
+				if (ImGui::Button("Yes", ImVec2(120, 0)))
+				{
+					celData.pickupArray->values.clear();
+					curPickup = -1;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("No", ImVec2(120, 0)))
+				{
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndChild();
+
+
+				ImGui::EndPopup();
+			}
+
+			ImGui::EndChild();
+
+
 			ImGui::EndChild();
 			ImGui::EndTabItem();
 		}
-		ImGui::EndTabBar();
-
-
-
 	}
+	if (ImGui::BeginTabItem("Riser Audio")) {
+		ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize), true);
+		display_cel_audio_options(celData, assetRiser, moggFilesRiser, fusionFileRiser, fusionPackageFileRiser, duplicate_moggsRiser, true);
+		ImGui::EndChild();
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
+		ImGui::BeginChild("Advanced - Riser", ImVec2(ImGui::GetContentRegionAvail().x, oggWindowSize), true);
+		if (ImGui::Button("Export Riser Fusion File")) {
+			auto file = SaveFile("Fusion Text File (.fusion)\0*.fusion\0", "fusion", "");
+			if (file) {
+				for (auto&& f : assetRiser.audio.audioFiles) {
+					if (f.fileType == "FusionPatchResource") {
+
+						std::ofstream outFile(*file);
+						std::string outStr = hmx_fusion_parser::outputData(std::get<HmxAudio::PackageFile::FusionFileResource>(f.resourceHeader).nodes);
+						outFile << outStr;
+
+						break;
+					}
+				}
+			}
+		}
+
+		if (ImGui::Button("Import Riser Fusion File")) {
+			auto file = OpenFile("Fusion Text File (.fusion)\0*.fusion\0");
+			if (file) {
+				for (auto&& f : assetRiser.audio.audioFiles) {
+					if (f.fileType == "FusionPatchResource") {
+
+						std::ifstream infile(*file, std::ios_base::binary);
+						std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
+						std::get<HmxAudio::PackageFile::FusionFileResource>(f.resourceHeader).nodes = hmx_fusion_parser::parseData(fileData);
+
+						break;
+					}
+				}
+			}
+		}
+
+		ImGui::Spacing();
+
+		bool overwrite_midiRiser = false;
+		bool majRiser = true;
+
+		if (ImGui::Button("Overwrite Riser Major Midi File")) {
+			overwrite_midiRiser = true;
+		}
+		else if (ImGui::Button("Overwrite Riser Minor Midi File")) {
+			overwrite_midiRiser = true;
+			majRiser = false;
+		}
+
+		if (overwrite_midiRiser) {
+			try {
+				auto file = OpenFile("MIDI File (.mid)\0*.mid\0");
+				if (file) {
+					AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
+					if (majRiser) {
+						midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
+					}
+					else {
+						midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
+					}
+
+					auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
+					auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
+
+					HmxAudio::PackageFile::MidiFileResource mfr;
+
+					if (endsWith(*file, ".mid")) {
+						mfr.MFR_from_midi(*file);
+					}
+					else if (endsWith(*file, ".mid_pc")) {
+						mfr.MFRImport(*file);
+					}
+
+					if (mfr.magic == 2) {
+						midiAssetRiser.audio.audioFiles[0].resourceHeader = std::move(mfr);
+					}
+				}
+			}
+			catch (const std::exception& ex) {
+				ErrorModal("Overwrite MIDI Failed", ex.what());
+			}
+		}
+
+		ImGui::Spacing();
+
+
+		bool export_midiRiser = false;
+
+		if (ImGui::Button("Export Riser Major Midi File")) {
+			export_midiRiser = true;
+			majRiser = true;
+		}
+		else if (ImGui::Button("Export Riser Minor Midi File")) {
+			export_midiRiser = true;
+			majRiser = false;
+		}
+
+		if (export_midiRiser) {
+			try {
+				auto file = SaveFile("MIDI (.mid)\0*.mid\0", "mid", "");
+				if (file) {
+					AssetLink<MidiSongAsset>* midiSongRiser = nullptr;
+					if (majRiser) {
+						midiSongRiser = &celData.songTransitionFile.data.majorAssets[0];
+					}
+					else {
+						midiSongRiser = &celData.songTransitionFile.data.minorAssets[0];
+					}
+
+					auto&& midi_fileRiser = midiSongRiser->data.midiFile.data;
+					auto&& midiAssetRiser = std::get<HmxAssetFile>(midi_fileRiser.file.e->getData().data.catagoryValues[0].value);
+					std::get<HmxAudio::PackageFile::MidiFileResource>(midiAssetRiser.audio.audioFiles[0].resourceHeader).MFR_to_midi(*file);
+				}
+			}
+			catch (const std::exception& ex) {
+				ErrorModal("Save MIDI Failed", ex.what());
+			}
+
+		}
+		ImGui::PopStyleColor();
+		ImGui::EndChild();
+		ImGui::EndTabItem();
+	}
+	ImGui::EndTabBar();
 
 	if (celData.type.value == CelType::Type::Beat) {
 		bool allUnpitched = celData.allUnpitched == true;
@@ -2122,13 +2243,18 @@ void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice) {
 void custom_song_creator_update(size_t width, size_t height) {
 	bool do_open = false;
 	bool do_save = false;
-
+	bool do_new = false;
 	if (ImGui::BeginMainMenuBar())
 	{
 		if (ImGui::BeginMenu("File"))
 		{
 			if (ImGui::MenuItem("New")) {
+				if (gCtx.currentPak != nullptr) {
+					do_new = true;
+				}
+				else {
 				load_template();
+			}
 			}
 			if (ImGui::MenuItem("Open", "Ctrl+O")) {
 				do_open = true;
@@ -2262,11 +2388,11 @@ void custom_song_creator_update(size_t width, size_t height) {
 			}
 
 			ImGui::EndMenu();
-	}
+		}
 #endif
 
 		ImGui::EndMainMenuBar();
-}
+	}
 
 	auto&& input = ImGui::GetIO();
 
@@ -2362,6 +2488,31 @@ void custom_song_creator_update(size_t width, size_t height) {
 		ImGui::Text("To open an existing custom song, use File -> Open.");
 	}
 
+	if (do_new) {
+		ImGui::OpenPopup("Confirm New Custom");
+	}
+	if (ImGui::BeginPopupModal("Confirm New Custom", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
+		ImGui::BeginChild("Text", ImVec2(420, 85));
+		ImGui::Text("Would you like to make a new custom?");
+		ImGui::TextWrapped("WARNING: Any changes you have made will be lost unless you have saved.");
+		ImGui::EndChild();
+		ImGui::BeginChild("Buttons", ImVec2(420, 25));
+		if (ImGui::Button("Yes", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+			load_template();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("No", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndChild();
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
 	ImGui::End();
 	ImGui::PopStyleVar();
 }

@@ -937,9 +937,11 @@ struct HmxAudio {
 		struct MidiFileResource {
 			struct MFRTrack {
 				u32 trackname_str_idx;
+
 				struct MFREvent {
 					u32 tick;
 					u8 event_type;
+
 					struct EventData_Midi {
 						u8 channel;
 						u8 type;
@@ -961,6 +963,7 @@ struct HmxAudio {
 						}
 
 					};
+
 					struct EventData_Tempo {
 						u32 tempo;
 						void serialize(DataBuffer& buffer) {
@@ -979,8 +982,8 @@ struct HmxAudio {
 								
 							}
 						}
-
 					};
+
 					struct EventData_TimeSig {
 						u8 numer;
 						u8 denompow2;
@@ -999,6 +1002,7 @@ struct HmxAudio {
 
 						}
 					};
+
 					struct EventData_Meta {
 						u8 type;
 						u16 string_index;
@@ -1010,7 +1014,9 @@ struct HmxAudio {
 							}
 						}
 					};
+
 					std::variant<EventData_Midi,EventData_Tempo,EventData_TimeSig,EventData_Meta> event_data;
+
 					void serialize(DataBuffer& buffer) {
 						buffer.serialize(tick);
 						buffer.serialize(event_type);
@@ -1054,6 +1060,7 @@ struct HmxAudio {
 						
 					}
 				};
+
 				u8 unk0;
 				i32 unk1;
 				u32 num_events;
@@ -1069,23 +1076,23 @@ struct HmxAudio {
 					buffer.serialize(num_strings);
 					buffer.serializeWithSize_nonull(strings, num_strings);
 					if (buffer.loading) {
-						int event_idx = 0;
 						for (MFREvent& eventdata : events) {
 							if (eventdata.event_type == 8) {
 								auto& edata = std::get<MFREvent::EventData_Meta>(eventdata.event_data);
-								if (edata.type == 3) {
-									trackname_str_idx == edata.string_index;
+								if ((int)edata.type == 3) {
+									trackname_str_idx = edata.string_index;
 									break;
 								}
 							}
-							event_idx++;
 						}
 					}
 					
 					
 					
 				}
+
 			};
+
 			u32 fuser_revision = 1;
 			i32 magic;
 			u32 last_track_final_tick;
@@ -1196,6 +1203,7 @@ struct HmxAudio {
 				buffer.serialize(tracknames_len);
 				buffer.serializeWithSize_nonull(tracknames, tracknames_len);
 			}
+
 			void MFRImport(std::string file) {
 				std::ifstream infile(file, std::ios_base::binary);
 
@@ -1206,6 +1214,7 @@ struct HmxAudio {
 				dataBuf.setupVector(fileData);
 				serialize(dataBuf);
 			}
+
 			void MFR_to_midi(std::string file) {
 				std::vector<MidiTrack> midi_tracks;
 				for (MFRTrack& track : tracks) {
@@ -1358,7 +1367,7 @@ struct HmxAudio {
 							}
 						}
 						else if (event.type == EventType::Sysex || event.type == EventType::SysexRaw) {
-							std::cout << "sysex" << std::endl;
+							//do nothing for sysex, isn't used.
 						}
 						else {
 							MFRTrack::MFREvent::EventData_Midi mfrMidi;
@@ -1494,6 +1503,27 @@ struct HmxAudio {
 				beats_len = beats.size();
 				tracknames_len = tracknames.size();
 				chords_len = chords.size();
+			}
+
+			int MFR_is_single_note() {
+				int midiEventCount = 0;
+				for (auto track : tracks) {
+					if (track.strings[track.trackname_str_idx] == "samplemidi") {
+						for (auto mfrevent : track.events) {
+							if (mfrevent.event_type == 1) {
+								midiEventCount++;
+							}
+						}
+						if (midiEventCount == 2) {
+							return 1;
+						}
+						else {
+							return 0;
+						}
+					}
+				}
+				std::cout << std::endl;
+				return 2;
 			}
 		};
 
