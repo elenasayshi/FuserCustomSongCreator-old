@@ -532,16 +532,17 @@ struct IconFileAsset {
 
 struct MidiFileAsset {
 	SongPakEntry file;
-
+	bool minor = false;
 	void serialize(SongSerializationCtx &ctx) {
-
+		auto&& hmxAsset = std::get<HmxAssetFile>(file.e->getData().data.catagoryValues[0].value);
+		auto& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(hmxAsset.audio.audioFiles[0].resourceHeader);
+		mfr.minor = minor;
 		if (!ctx.loading) {
 			file.serialize(ctx, ctx.folderRoot() + ctx.subCelFolder() + "midi/", ctx.subCelName() + "_mid" + ctx.midiSuffix());
-
-			auto &&hmxAsset = std::get<HmxAssetFile>(file.e->getData().data.catagoryValues[0].value);
 			hmxAsset.originalFilename = file.name;
 			hmxAsset.audio.audioFiles[0].fileName = Game_Prefix + file.path + ".mid";
 		}
+		
 	}
 };
 
@@ -569,18 +570,44 @@ struct FusionFileAsset {
 					moggFiles.emplace_back(&file);
 				}
 			}
-			
+			auto&& fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionFile->resourceHeader);
+			auto map = fusion.nodes.getNode("keymap");
+			if (fusion.nodes.getChild("audio_labels") == nullptr) {
+				hmx_fusion_node audiolabelholder;
+				audiolabelholder.key = "audio_labels";
+				audiolabelholder.value = new hmx_fusion_nodes;
+				auto& alnodes = std::get<hmx_fusion_nodes*>(audiolabelholder.value);
+				int idx = 0;
+				for (auto& f : moggFiles) {
+					size_t found1 = f->fileName.rfind("_");
+					size_t found2 = f->fileName.rfind(".mogg");
+					std::string key = f->fileName.substr(found1, found2 - found1);
+					hmx_fusion_node audiolabel;
+					audiolabel.key = ctx.subCelName() + key;
+					audiolabel.value = ctx.subCelName() + key;
+					alnodes->children.emplace_back(audiolabel);
+				}
+				fusion.nodes.children.insert(fusion.nodes.children.begin(), audiolabelholder);
+			}
+			auto& audioLabels = fusion.nodes.getNode("audio_labels");
+			int testidx = 0;
+			for (auto& label : audioLabels.children) {
+				
+				size_t found1 = label.key.rfind("_");
+				std::cout << testidx << ": " << label.key << " ->";
+				label.key = ctx.subCelName() + label.key.substr(found1, label.key.length());
+				std::cout << label.key << std::endl;
+				testidx++;
+			}
 			for (auto &&f : moggFiles) {
 				size_t found1 = f->fileName.rfind("_");
 				size_t found2 = f->fileName.rfind(".mogg");
 				std::string key = f->fileName.substr(found1, found2 - found1);
+
 				f->fileName = "C:/" + ctx.subCelName() + key + ".mogg";
 				auto &&moggHeader = std::get<HmxAudio::PackageFile::MoggSampleResourceHeader>(f->resourceHeader);			
 			}
-
 			fusionFile->fileName = Game_Prefix + file.path + ".fusion";
-			auto &&fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionFile->resourceHeader);
-			auto map = fusion.nodes.getNode("keymap");
 			for (auto c : map.children) {
 				auto nodes = std::get<hmx_fusion_nodes*>(c.value);
 
@@ -607,7 +634,6 @@ struct MidiSongAsset {
 	void serialize(SongSerializationCtx &ctx) {
 		auto &&hmxAsset = std::get<HmxAssetFile>(file.e->getData().data.catagoryValues[0].value);
 		auto &&midiMusic = std::get<HmxAudio::PackageFile::MidiMusicResource>(hmxAsset.audio.audioFiles[0].resourceHeader);
-
 		if (ctx.loading) {
 			auto fusionPath = midiMusic.patch_engine_path.str;
 			fusionPath = fusionPath.substr(0, fusionPath.find_first_of('.'));
@@ -629,6 +655,7 @@ struct MidiSongAsset {
 		}
 
 		ctx.curMidiType = major ? MidiType::Major : MidiType::Minor;
+		midiFile.data.minor = !major;
 		midiFile.serialize(ctx);
 		fusionFile.serialize(ctx);
 

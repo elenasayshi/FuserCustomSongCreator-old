@@ -935,6 +935,9 @@ struct HmxAudio {
 		};
 
 		struct MidiFileResource {
+			bool minor = false;
+			std::vector<std::string> minorChords = { "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "b2" };
+			std::vector<std::string> majorChords = { "1", "2m", "3m", "4", "5", "6m", "b2" };
 			struct MFRTrack {
 				u32 trackname_str_idx;
 
@@ -1069,6 +1072,7 @@ struct HmxAudio {
 				std::vector<std::string> strings;
 				
 				void serialize(DataBuffer& buffer) {
+					
 					buffer.serialize(unk0);
 					buffer.serialize(unk1);
 					buffer.serialize(num_events);
@@ -1168,8 +1172,110 @@ struct HmxAudio {
 			u32 tracknames_len;
 			std::vector<std::string> tracknames;
 
+			void updateChords() {
+				chords_len = chords.size();
+				for (int i = 0; i < chords.size(); i++) {
+					if (i < chords.size() - 1) {
+						chords[i].end = chords[i + 1].end - 1;
+					}
+					else {
+						chords[i].end = final_tick;
+					}
+				}
+				int chordsTrack_idx = -1;
+				for (int i = 0; i < tracks.size(); i++) {
+					if (tracks[i].strings[tracks[i].trackname_str_idx] == "chords") {
+						chordsTrack_idx = i;
+						break;
+					}
+				}
+				if (chordsTrack_idx > -1) {
+					tracks.erase(tracks.begin() + chordsTrack_idx);
+				}
+				if (chords.size() > 0) {
+					MFRTrack chordsTrack;
+					chordsTrack.unk0 = 1;
+					chordsTrack.unk1 = -1;
+					chordsTrack.strings.emplace_back("chords");
+					chordsTrack.trackname_str_idx = 0;
+					if (minor) {
+						chordsTrack.strings.insert(chordsTrack.strings.end(), minorChords.begin(), minorChords.end());
+					}
+					else {
+						chordsTrack.strings.insert(chordsTrack.strings.end(), majorChords.begin(), majorChords.end());
+					}
+					MFRTrack::MFREvent trackNameEvent;
+					MFRTrack::MFREvent::EventData_Meta trackNameData;
+					trackNameData.type = 3;
+					trackNameData.string_index = 0;
+					trackNameEvent.event_data = std::move(trackNameData);
+					trackNameEvent.event_type = 8;
+					trackNameEvent.tick = 0;
+					chordsTrack.events.emplace_back(trackNameEvent);
+					for (auto& chd : chords) {
+						std::cout << minor << std::endl;
+						if (minor) {
+							if (std::find(minorChords.begin(), minorChords.end(), chd.name) == minorChords.end()) {
+								if (chd.name == "1")
+									chd.name = "1m";
+								else if (chd.name == "2m")
+									chd.name = "2mb5";
+								else if (chd.name == "3m")
+									chd.name = "b3";
+								else if (chd.name == "4")
+									chd.name = "4m";
+								else if (chd.name == "5")
+									chd.name = "5m";
+								else if (chd.name == "6m")
+									chd.name = "b6";
+								else {
+									chd.name = "1m";
+								}
+							}
+						}
+						else {
+							if (std::find(majorChords.begin(), majorChords.end(), chd.name) == majorChords.end()) {
+								if (chd.name == "1m")
+									chd.name = "1";
+								else if (chd.name == "2mb5")
+									chd.name = "2m";
+								else if (chd.name == "b3")
+									chd.name = "3m";
+								else if (chd.name == "4m")
+									chd.name = "4";
+								else if (chd.name == "5m" || chd.name == "b7")
+									chd.name = "5";
+								else if (chd.name == "b6")
+									chd.name = "6m";
+								else {
+									chd.name = "1";
+								}
+							}
+						}
+						MFRTrack::MFREvent chdEvent;
+						MFRTrack::MFREvent::EventData_Meta chdData;
+						for (int i = 0; i < chordsTrack.strings.size(); i++) {
+							if (chordsTrack.strings[i] == chd.name) {
+								chdData.string_index = i;
+							}
+						}
+						chdData.type = 1;
+						chdEvent.event_data = std::move(chdData);
+						chdEvent.event_type = 8;
+						chdEvent.tick = chd.start;
+						chordsTrack.events.emplace_back(chdEvent);
+					}
+					chordsTrack.num_events = chordsTrack.events.size();
+					chordsTrack.num_strings = chordsTrack.strings.size();
+					tracks.emplace_back(chordsTrack);
+				}
+			}
+
 			void serialize(DataBuffer& buffer) {
 
+				if (!buffer.loading) {
+					updateChords();
+				}
 				buffer.serialize(magic);
 				buffer.serialize(last_tick);
 				buffer.serialize(num_tracks);
@@ -1198,7 +1304,7 @@ struct HmxAudio {
 				if (fuser_revision > 1) {
 					buffer.serialize(fuser_revision_2);
 					buffer.serialize(chords_len);
-					buffer.serializeWithSize(chords,chords_len);
+					buffer.serializeWithSize(chords, chords_len);
 				}
 				buffer.serialize(tracknames_len);
 				buffer.serializeWithSize_nonull(tracknames, tracknames_len);
@@ -1216,6 +1322,7 @@ struct HmxAudio {
 			}
 
 			void MFR_to_midi(std::string file) {
+				updateChords();
 				std::vector<MidiTrack> midi_tracks;
 				for (MFRTrack& track : tracks) {
 					u32 midi_tick = 0;
@@ -1502,7 +1609,7 @@ struct HmxAudio {
 				timesigs_len = timesigs.size();
 				beats_len = beats.size();
 				tracknames_len = tracknames.size();
-				chords_len = chords.size();
+				updateChords();
 			}
 
 			int MFR_is_single_note() {
