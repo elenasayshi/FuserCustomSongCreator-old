@@ -2452,6 +2452,32 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 					if (ImGui::Button("Clear Pickups")) {
 						ImGui::OpenPopup("Clear Pickups?");
 					}
+
+
+					if (ImGui::BeginPopupModal("Clear Pickups?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+					{
+						ImGui::BeginChild("Text", ImVec2(420, 69));
+						ImGui::Text("Are you sure you would like to clear pickups?");
+						ImGui::TextWrapped("WARNING: Will erase all pickups");
+						ImGui::EndChild();
+						ImGui::BeginChild("Buttons", ImVec2(420, 25));
+						if (ImGui::Button("Yes", ImVec2(120, 0)))
+						{
+							celData.pickupArray->values.clear();
+							curPickup = -1;
+							ImGui::CloseCurrentPopup();
+						}
+						ImGui::SameLine();
+						if (ImGui::Button("No", ImVec2(120, 0)))
+						{
+							ImGui::CloseCurrentPopup();
+						}
+						ImGui::EndChild();
+
+
+						ImGui::EndPopup();
+					}
+
 					ImGui::EndChild();
 					ImGui::EndTabItem();
 				}
@@ -2463,31 +2489,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 					ImGui::EndTabItem();
 				}
 				ImGui::EndTabBar();
-			}
-
-
-			if (ImGui::BeginPopupModal("Clear Pickups?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-			{
-				ImGui::BeginChild("Text", ImVec2(420, 69));
-				ImGui::Text("Are you sure you would like to clear pickups?");
-				ImGui::TextWrapped("WARNING: Will erase all pickups");
-				ImGui::EndChild();
-				ImGui::BeginChild("Buttons", ImVec2(420, 25));
-				if (ImGui::Button("Yes", ImVec2(120, 0)))
-				{
-					celData.pickupArray->values.clear();
-					curPickup = -1;
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("No", ImVec2(120, 0)))
-				{
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndChild();
-
-
-				ImGui::EndPopup();
 			}
 
 
