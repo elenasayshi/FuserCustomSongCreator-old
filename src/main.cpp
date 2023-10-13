@@ -41,6 +41,8 @@ size_t window_height = 800;
 extern void custom_song_creator_update(size_t width, size_t height);
 extern void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice);
 extern void initAudio();
+bool unsavedChanges=false;
+extern bool closePressed;
 HWND G_hwnd;
 
 
@@ -249,6 +251,16 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
     switch (msg)
     {
+    case WM_CLOSE:
+        if (unsavedChanges)
+        {
+            closePressed = true;
+        }
+        else
+        {
+            DestroyWindow(hWnd);
+        }
+        return 0;
     case WM_SIZE:
         if (g_pd3dDevice != NULL && wParam != SIZE_MINIMIZED)
         {
