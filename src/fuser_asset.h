@@ -219,6 +219,7 @@ struct SongSerializationCtx {
 	FuserEnums::Genre::Value genre;
 	i32 year;
 	bool isTransition = false;
+	bool isStreamOptimized = false;
 	bool smallArt = false;
 
 	std::string folderRoot() {
@@ -594,9 +595,7 @@ struct FusionFileAsset {
 			for (auto& label : audioLabels.children) {
 				
 				size_t found1 = label.key.rfind("_");
-				std::cout << testidx << ": " << label.key << " ->";
 				label.key = ctx.subCelName() + label.key.substr(found1, label.key.length());
-				std::cout << label.key << std::endl;
 				testidx++;
 			}
 			for (auto &&f : moggFiles) {
@@ -1053,6 +1052,7 @@ struct AssetRoot {
 	std::string artistName;
 	std::string songName;
 	std::string songKey;
+	bool isStreamOptimized;
 	FuserEnums::KeyMode::Value keyMode;
 	FuserEnums::Genre::Value genre;
 	i32 year;
@@ -1081,10 +1081,19 @@ struct AssetRoot {
 		ctx.serializeText("Artist", artistName);
 		
 		ctx.serializePrimitive<i32>("Year", year);
+		
 		ctx.year = year;
 		if (ctx.loading) {
 			std::string actualKey = "EKey::C";
 			FuserEnums::KeyMode::Value actualMode = FuserEnums::KeyMode::Value::Major;
+			auto streamOptimizedProp= ctx.getProp<BoolProperty>("IsStreamOptimized");
+			if (streamOptimizedProp != nullptr) {
+				isStreamOptimized = streamOptimizedProp->value;
+			}
+			else {
+				isStreamOptimized = false;
+			}
+			ctx.isStreamOptimized = isStreamOptimized;
 			auto genrePtr = ctx.getProp<EnumProperty>(ctx.curEntry, "Genre");
 			auto genreStr = genrePtr->value.getString(ctx.getHeader());
 			genre = FuserEnums::ToValue<FuserEnums::Genre>(genreStr);
@@ -1126,6 +1135,8 @@ struct AssetRoot {
 			auto genreStr = FuserEnums::FromValue<FuserEnums::Genre>(genre);
 			ctx.serializeName("SongShortName", shortName);
 			ctx.serializeEnum("Genre", genreStr);
+			auto streamOptimizedProp = ctx.getOrCreateProp<BoolProperty>("IsStreamOptimized");
+			streamOptimizedProp.prop->value = isStreamOptimized;
 
 			size_t idx = 0;
 			for (auto &&e : celData) {

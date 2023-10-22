@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 file(GLOB SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/res/resource.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/configfile.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/stream-helpers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/stream-helpers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SMF.h

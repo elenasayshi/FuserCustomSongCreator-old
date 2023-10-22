@@ -27,10 +27,12 @@ namespace fs = std::filesystem;
 #include "fuser_asset.h"
 
 #include "bass/bass.h"
+#include "configfile.h"
 
 #define RGBCX_IMPLEMENTATION
 #include "rgbcx.h"
 
+extern ConfigFile fcsc_cfg;
 extern HWND G_hwnd;
 bool endsWith(const std::string& str, const std::string& suffix) {
 	if (str.size() >= suffix.size()) {
@@ -266,7 +268,7 @@ static std::optional<std::string> OpenFile(LPCSTR filter) {
 	ZeroMemory(&szFileName, sizeof(szFileName));
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
-	ofn.hwndOwner = NULL;
+	ofn.hwndOwner = G_hwnd;
 	ofn.lpstrFile = szFileName;
 	ofn.lpstrFile[0] = '\0';
 	ofn.nMaxFile = sizeof(szFileName);
@@ -292,7 +294,7 @@ static std::optional<std::string> SaveFile(LPCSTR filter, LPCSTR ext, const std:
 	ZeroMemory(&ofn, sizeof(ofn));
 	memcpy(szFileName, fileName.data(), std::min(fileName.size(), (size_t)MAX_PATH));
 	ofn.lStructSize = sizeof(ofn);
-	ofn.hwndOwner = NULL;
+	ofn.hwndOwner = G_hwnd;
 	ofn.lpstrFile = szFileName;
 	ofn.nMaxFile = sizeof(szFileName);
 	ofn.lpstrFilter = filter;
@@ -516,6 +518,7 @@ void load_template() {
 	dataBuf.buffer = (u8*)custom_song_pak_template;
 	dataBuf.size = sizeof(custom_song_pak_template);
 	load_file(std::move(dataBuf));
+	gCtx.currentPak.get()->root.shortName = fcsc_cfg.defaultShortName;
 }
 
 void save_file() {
@@ -524,7 +527,6 @@ void save_file() {
 	ctx.pak = &gCtx.currentPak->pak;
 
 	gCtx.currentPak->root.serialize(ctx);
-
 
 	std::vector<u8> outData;
 	DataBuffer outBuf;
@@ -611,6 +613,11 @@ void display_main_properties() {
 	ChooseFuserEnum<FuserEnums::Genre>("Genre", root.genre, false);
 	if(ImGui::InputScalar("Year", ImGuiDataType_S32, &root.year))
 		unsavedChanges = true;
+
+	if (ImGui::Checkbox("Is Stream Optimized?", &root.isStreamOptimized))
+		unsavedChanges = true;
+	ImGui::SameLine();
+	HelpMarker("When checked, the song will show up under the 'Stream Optimized' category in the game. Most songs won't have this checked, but if the song falls under a license that would make it safe for streaming/videos, it can. Public Domain songs, in-house (original songs made by you), as well as some versions of the Creative Commons license would mean that the song can fall under this category.");
 }
 //#include "stb_image_write.h"
 
@@ -895,7 +902,12 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		ImGui::EndCombo();
 	}
 	if (ImGui::CollapsingHeader("Advanced Keymap Settings")) {
-
+		int minvel = keyzone->getInt("min_velocity");
+		int maxvel = keyzone->getInt("max_velocity");
+		if (fcsc_cfg.usePercentVelocity) {
+			minvel = minvel / 1.27;
+			maxvel = maxvel / 1.27;
+		}
 		bool sng = keyzone->getInt("singleton") == 1;
 		bool sng_changed = ImGui::Checkbox("Singleton", &sng);
 		if (sng_changed) {
@@ -1011,20 +1023,27 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		ImGui::SameLine();
 		HelpMarker("The note at which that the selected sample will play at its original pitch.");
 
-		if (ImGui::InputScalar("Map - Min Velocity", ImGuiDataType_U32, &keyzone->getInt("min_velocity"))) {
+		if (ImGui::InputScalar("Map - Min Velocity", ImGuiDataType_U32, &minvel)) {
 			unsavedChanges = true;
 			selectedPreset = 3;
 			keyzone->getInt("keymap_preset") = 3;
-			keyzone->getInt("min_velocity") = std::clamp(keyzone->getInt("min_velocity"), 0, 127);
+			if (fcsc_cfg.usePercentVelocity)
+				keyzone->getInt("min_velocity") = std::ceil(std::clamp(minvel, 0, 100) * 1.27);
+			else
+				keyzone->getInt("min_velocity") = std::clamp(minvel, 0, 127);
+			
 		}
 		ImGui::SameLine();
 		HelpMarker("The lowest midi note velocity at which the selected sample will play.");
 
-		if (ImGui::InputScalar("Map - Max Velocity", ImGuiDataType_U32, &keyzone->getInt("max_velocity"))) {
+		if (ImGui::InputScalar("Map - Max Velocity", ImGuiDataType_U32, &maxvel)) {
 			unsavedChanges = true;
 			selectedPreset = 3;
 			keyzone->getInt("keymap_preset") = 3;
-			keyzone->getInt("max_velocity") = std::clamp(keyzone->getInt("max_velocity"), 0, 127);
+			if (fcsc_cfg.usePercentVelocity)
+				keyzone->getInt("max_velocity") = std::ceil(std::clamp(maxvel, 0, 100) * 1.27);
+			else
+				keyzone->getInt("max_velocity") = std::clamp(maxvel, 0, 127);
 		}
 		ImGui::SameLine();
 		HelpMarker("The highest midi note velocity at which the selected sample will play.");
@@ -1050,7 +1069,8 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 	}
 
 }
-
+bool midi_error = false;
+std::string mfrError;
 void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio::PackageFile*& fusionPackageFile, std::vector<HmxAudio::PackageFile*>& moggFiles, bool disc_advanced, int disc_midi_maj_single, int disc_midi_min_single, bool isRiser = false)
 {
 	ImVec2 btnHolderSize = ImVec2(ImGui::GetContentRegionAvail().x / 2, 30);
@@ -1097,7 +1117,7 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 	ImGui::Text("Overwrite MIDI");
 	bool overwrite_midi = false;
 	bool maj = true;
-
+	midi_error = false;
 	ImGui::BeginChild("btnL2", btnHolderSize);
 	if (ImGui::Button("Major##OVERWRITEMAJOR", btnHolderSize)) {
 		overwrite_midi = true;
@@ -1173,12 +1193,23 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 					}
 					midiAsset.audio.audioFiles[0].resourceHeader = std::move(mfr);
 				}
-
+				else {
+					midi_error = true;
+					if (mfr.magic == 0) {
+						mfrError = "MIDI file does not contain 'samplemidi' track";
+					}
+					else if (mfr.magic == 480) {
+						mfrError = "Ticks per quarter note is not set to 480";
+					}
+					
+				}
 			}
 		}
 		catch (const std::exception& ex) {
-			ErrorModal("Overwrite MIDI Failed", ex.what());
+			midi_error = true;
+			mfrError = ex.what();
 		}
+		
 
 	}
 
@@ -1219,10 +1250,10 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 			}
 		}
 		catch (const std::exception& ex) {
-			ErrorModal("Save MIDI Failed", ex.what());
+			midi_error = true;
+			mfrError = ex.what();
 		}
 	}
-
 	if (!isRiser) {
 		bool tickLengthAdvanced = celData.tickLengthAdvanced;
 		if (disc_advanced) {
@@ -1311,6 +1342,7 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 			ImGui::Text("Minor MIDI length cannot be automatically updated");
 		}
 	}
+	
 }
 const char* chordNamesMinor[] = { "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "b2" };
 const char* chordNamesMajor[] = { "1", "2m", "3m", "4", "5", "6m", "b2" };
@@ -2031,7 +2063,6 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 					break;
 				}
 			}
-			std::cout << (chordExists ? "true" : "false") << std::endl;
 			if (!chordExists) {
 				mfr.chords[curChord].start = (int)(chordInput * 480);
 				std::sort(mfr.chords.begin(), mfr.chords.end(), compareChords);
@@ -2185,7 +2216,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 			auto&& midi_file = midiSong->data.midiFile.data;
 			auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
 			int isSingleNote = mfr.MFR_is_single_note();
-			std::cout << celData.shortName << ": " << isSingleNote << std::endl;
 			if (isSingleNote < 2) {
 				node.value = isSingleNote;
 				disc_midi_maj_single = isSingleNote;
@@ -2208,7 +2238,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 			auto&& midi_file = midiSong->data.midiFile.data;
 			auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
 			int isSingleNote = mfr.MFR_is_single_note();
-			std::cout << celData.shortName << ": " << isSingleNote << std::endl;
 			if (isSingleNote < 2) {
 				node.value = isSingleNote;
 				disc_midi_min_single = isSingleNote;
@@ -2414,6 +2443,26 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 			if (ImGui::BeginTabBar("DiscAdvancedTabs")) {
 				if (ImGui::BeginTabItem("Fusion/MIDI")) {
 					display_fusionmidisettings(asset, celData, fusionPackageFile, moggFiles, disc_advanced, disc_midi_maj_single, disc_midi_min_single);
+					if (midi_error) {
+						if (ImGui::BeginPopupModal("MIDI Error", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+						{
+							ImGui::PopStyleColor();
+							ImGui::BeginChild("Text", ImVec2(420, 69));
+							ImGui::TextWrapped(mfrError.c_str());
+							ImGui::EndChild();
+							ImGui::BeginChild("Buttons", ImVec2(420, 25));
+							if (ImGui::Button("OK", ImVec2(120, 0)))
+							{
+								ImGui::CloseCurrentPopup();
+							}
+							ImGui::EndChild();
+
+
+							ImGui::EndPopup();
+							ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
+						}
+
+					}
 					ImGui::EndTabItem();
 				}
 				if (ImGui::BeginTabItem("Pickups")) {
@@ -2539,6 +2588,7 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 
 					if (ImGui::BeginPopupModal("Clear Pickups?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 					{
+						ImGui::PopStyleColor();
 						ImGui::BeginChild("Text", ImVec2(420, 69));
 						ImGui::Text("Are you sure you would like to clear pickups?");
 						ImGui::TextWrapped("WARNING: Will erase all pickups");
@@ -2560,6 +2610,7 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 
 
 						ImGui::EndPopup();
+						ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
 					}
 
 					ImGui::EndChild();
@@ -2580,22 +2631,22 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 			ImGui::PopStyleColor();
 			ImGui::EndTabItem();
 		}
-	}
-	if (ImGui::BeginTabItem("Riser Audio")) {
-		ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize), true);
-		display_cel_audio_options(celData, assetRiser, moggFilesRiser, fusionFileRiser, fusionPackageFileRiser, duplicate_moggsRiser, true);
-		ImGui::EndChild();
-		ImGui::SameLine();
-		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
-		ImGui::BeginChild("Advanced - Riser", ImVec2(ImGui::GetContentRegionAvail().x, oggWindowSize), true);
-		display_fusionmidisettings(assetRiser, celData, fusionPackageFileRiser, moggFilesRiser, rise_advanced, 0, 0, true);
 
-		ImGui::PopStyleColor();
-		ImGui::EndChild();
-		ImGui::EndTabItem();
-	}
-	ImGui::EndTabBar();
+		if (ImGui::BeginTabItem("Riser Audio")) {
+			ImGui::BeginChild("AudioSettingsRiser", ImVec2((windowSize.x / 3) * 2, oggWindowSize), true);
+			display_cel_audio_options(celData, assetRiser, moggFilesRiser, fusionFileRiser, fusionPackageFileRiser, duplicate_moggsRiser, true);
+			ImGui::EndChild();
+			ImGui::SameLine();
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
+			ImGui::BeginChild("Advanced - Riser", ImVec2(ImGui::GetContentRegionAvail().x, oggWindowSize), true);
+			display_fusionmidisettings(assetRiser, celData, fusionPackageFileRiser, moggFilesRiser, rise_advanced, 0, 0, true);
 
+			ImGui::PopStyleColor();
+			ImGui::EndChild();
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
 	if (celData.type.value == CelType::Type::Beat) {
 		bool allUnpitched = celData.allUnpitched == true;
 		bool allUnpitchedChanged = ImGui::Checkbox("Track has no key?", &allUnpitched);
@@ -2618,7 +2669,7 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 		celData.allUnpitched = false;
 		celData.songTransitionFile.data.allUnpitched = false;
 	}
-
+	
 }
 
 
@@ -2631,7 +2682,7 @@ void custom_song_creator_update(size_t width, size_t height) {
 	bool do_open = false;
 	bool do_save = false;
 	bool do_new = false;
-	
+	bool open_preferences = false;
 
 	ImGui::SetNextWindowPos(ImVec2{ 0, 0 });
 	ImGui::SetNextWindowSize(ImVec2{ (float)width, (float)height });
@@ -2648,11 +2699,12 @@ void custom_song_creator_update(size_t width, size_t height) {
 		if (ImGui::BeginMenu("File"))
 		{
 			if (ImGui::MenuItem("New")) {
-				if (gCtx.currentPak != nullptr && unsavedChanges) {
-					do_new = true;
+				if (gCtx.currentPak == nullptr) {
+					load_template(); 
+					
 				}
 				else {
-					load_template();
+					do_new = true;
 				}
 			}
 			if (ImGui::MenuItem("Open", "Ctrl+O")) {
@@ -2670,6 +2722,9 @@ void custom_song_creator_update(size_t width, size_t height) {
 
 			if (ImGui::MenuItem("Save As..")) {
 				select_save_location();
+			}
+			if (ImGui::MenuItem("Preferences##MENUITEM")) {
+				open_preferences = true;
 			}
 
 			ImGui::EndMenu();
@@ -2712,7 +2767,6 @@ void custom_song_creator_update(size_t width, size_t height) {
 
 			ImGui::EndMenu();
 		}
-
 #if _DEBUG
 		if (ImGui::BeginMenu("Debug Menu"))
 		{
@@ -2819,7 +2873,7 @@ void custom_song_creator_update(size_t width, size_t height) {
 		}
 	}
 
-	if (do_save) {
+	if (do_save && gCtx.currentPak != nullptr) {
 		if (!gCtx.saveLocation.empty()) {
 			save_file();
 		}
@@ -2827,6 +2881,38 @@ void custom_song_creator_update(size_t width, size_t height) {
 			select_save_location();
 		}
 	}
+	if (do_new) {
+		if (unsavedChanges)
+			ImGui::OpenPopup("Confirm New Custom");
+		else {
+			load_template();
+		}
+	}
+		
+
+	if (ImGui::BeginPopupModal("Confirm New Custom", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
+		ImGui::BeginChild("Text", ImVec2(420, 85));
+		ImGui::Text("Would you like to make a new custom?");
+		ImGui::TextWrapped("WARNING: Any changes you have made will be lost unless you have saved.");
+		ImGui::EndChild();
+		ImGui::BeginChild("Buttons", ImVec2(420, 25));
+		if (ImGui::Button("Yes", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+			load_template();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("No", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndChild();
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
+
 	if (gCtx.currentPak != nullptr) {
 		windowTitle = (unsavedChanges ? "*" : " ") + gCtx.currentPak.get()->root.shortName + ": " + gCtx.currentPak.get()->root.artistName + " - " + gCtx.currentPak.get()->root.songName;
 		if (ImGui::BeginTabBar("Tabs")) {
@@ -2875,32 +2961,6 @@ void custom_song_creator_update(size_t width, size_t height) {
 
 		ImGui::Text("To open an existing custom song, use File -> Open.");
 	}
-
-	if (do_new) {
-		ImGui::OpenPopup("Confirm New Custom");
-	}
-	if (ImGui::BeginPopupModal("Confirm New Custom", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-	{
-		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
-		ImGui::BeginChild("Text", ImVec2(420, 85));
-		ImGui::Text("Would you like to make a new custom?");
-		ImGui::TextWrapped("WARNING: Any changes you have made will be lost unless you have saved.");
-		ImGui::EndChild();
-		ImGui::BeginChild("Buttons", ImVec2(420, 25));
-		if (ImGui::Button("Yes", ImVec2(120, 0)))
-		{
-			ImGui::CloseCurrentPopup();
-			load_template();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("No", ImVec2(120, 0)))
-		{
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndChild();
-		ImGui::EndChild();
-		ImGui::EndPopup();
-	}
 	if (closePressed) {
 		ImGui::OpenPopup("Exit without saving?");
 	}
@@ -2936,6 +2996,39 @@ void custom_song_creator_update(size_t width, size_t height) {
 
 		ImGui::EndPopup();
 	}
+	if(open_preferences)
+		ImGui::OpenPopup("Preferences##POPUP");
+	
+	if (ImGui::BeginPopupModal("Preferences##POPUP", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::BeginChild("Body", ImVec2(600, 69));
+		ImGui::Checkbox("Velocity as percentage?", &fcsc_cfg.usePercentVelocity);
+		ImGui::SameLine();
+		HelpMarker("Some DAWs use 0-100 instead of 0-127 for velocity, check this to use 0-100 for velocity values");
+		ImGui::InputText("Default Short Name", &fcsc_cfg.defaultShortName, ImGuiInputTextFlags_CallbackCharFilter, ValidateShortName);
+		ImGui::EndChild();
+		ImGui::BeginChild("Buttons", ImVec2(600, 25));
+		if (ImGui::Button("OK", ImVec2(200, 0)))
+		{
+			fcsc_cfg.saveConfig(fcsc_cfg.path);
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel", ImVec2(200, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Apply", ImVec2(200, 0)))
+		{
+			fcsc_cfg.saveConfig(fcsc_cfg.path);
+		}
+		ImGui::EndChild();
+
+
+		ImGui::EndPopup();
+	}
+
 	ImGui::End();
 	ImGui::PopStyleVar();
 	closePressed = false;

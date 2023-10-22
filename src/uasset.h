@@ -1405,17 +1405,22 @@ struct HmxAudio {
 			
 			void MFR_from_midi(std::string file) {
 				MidiFile inMidi = MidiFile::ReadMidi (std::ifstream(file, std::ios_base::binary));
+				magic = 2;
 				if (inMidi.ticks_per_qn() != 480) {
 					magic = 480;
+					return;
 				}
-				magic = 2;
+				
 				
 				last_track_final_tick = (u32)inMidi.tracks().back().total_ticks;
 				u32 new_final_tick = 0;
+				bool contains_samplemidi = false;
 				for (const auto& track : inMidi.tracks()) {
 					MFRTrack newTrack;
 					newTrack.unk0 = 1;
 					newTrack.unk1 = track.name == "samplemidi" ? 0 : -1;
+					if (track.name == "samplemidi")
+						contains_samplemidi = true;
 					u32 absolute_tick = 0;
 					int pbidx = 0;
 					for (auto& event : track.events) {
@@ -1547,6 +1552,10 @@ struct HmxAudio {
 							}
 						}
 					}
+				}
+				if(!contains_samplemidi) {
+					magic = 0;
+					return;
 				}
 				num_tracks = tracks.size();
 				std::vector<uint32_t> measure_ticks;

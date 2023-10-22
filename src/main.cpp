@@ -13,12 +13,13 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-
+#include <ShlObj.h>
 #include <iostream>
 #include <fstream>
-
+#include <string>
+#include <filesystem>
 #include "bass/bass.h"
-
+#include "configfile.h"
 #include <vector>
 
 // Data
@@ -46,6 +47,7 @@ extern bool closePressed;
 HWND G_hwnd;
 
 
+ConfigFile fcsc_cfg;
 // Main code
 int __stdcall WinMain(
     HINSTANCE hInstance,
@@ -137,7 +139,24 @@ int __stdcall WinMain(
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
-    
+    PWSTR appDataPath = nullptr;
+    if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appDataPath) == S_OK)
+    {
+        std::wstring appDataFolderPath(appDataPath);
+        CoTaskMemFree(appDataPath);
+
+        // Define your configuration folder path.
+        std::wstring configFolder = appDataFolderPath + L"\\FuserCustomsCreator";
+        std::wstring configFile = configFolder + L"\\config";
+        fcsc_cfg.path = configFile;
+        // Create the configuration folder if it doesn't exist.
+        if (!CreateDirectoryW(configFolder.c_str(), NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+        {
+            
+        }
+        fcsc_cfg.loadConfig(configFile);
+    }
+
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
     while (msg.message != WM_QUIT)

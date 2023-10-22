@@ -10,9 +10,6 @@ constexpr int MTrk = 0x4D54726B;
 constexpr int HEADER_SIZE = 6;
 
 TrackEvent ReadEvent(std::istream& stream, uint8_t& running_status) {
-    
-    //std::cout << "CURRENT OFFSET: " << stream.tellg() << std::endl;
-    //std::cout << "DELTATIME READ MULTIBYTE" << std::endl;
     auto deltaTime = read_mb(stream);
     auto status = (uint8_t)stream.peek();
     // set this to true if we expected to use running status but a status byte was provided anyway.
@@ -67,7 +64,6 @@ TrackEvent ReadEvent(std::istream& stream, uint8_t& running_status) {
     if (status == 0xFF) // meta event
     {
         auto type = read_be<MetaEventType>(stream);
-        //std::cout << "META_START_READMULTIBYTE" << std::endl;
         auto length = read_mb(stream);
         std::vector<uint8_t> tmp;
         switch (type)
@@ -128,7 +124,6 @@ TrackEvent ReadEvent(std::istream& stream, uint8_t& running_status) {
     }
     else // sysex
     {
-        std::cout << "SYSEX MULTIBYTE" << std::endl;
         auto length = read_mb(stream);
         std::vector<uint8_t> data;
         if (status == 0xF0) // should prefix Sysex with F0 (start-of-exclusive)
@@ -158,7 +153,6 @@ MidiTrack ReadTrack(std::istream& stream) {
     while (track_length > 0)
     {
         auto pos = stream.tellg();
-        //std::cout << "READING EVENT: "<<curEventIDX << std::endl;
         auto event = ReadEvent(stream, running_status);
         if (event.type == EventType::Meta && std::get<MetaEvent>(event.inner_event).type == MetaEventType::TrackName)
             name = std::get<std::string>(std::get<MetaEvent>(event.inner_event).event);
@@ -188,7 +182,6 @@ MidiFile MidiFile::ReadMidi(std::istream& stream) {
     std::vector<MidiTrack> tracks;
     for (int i = 0; i < num_tracks; i++)
     {
-        //std::cout << "READING TRACK: " << i << std::endl;
         tracks.push_back(ReadTrack(stream));
     }
     return MidiFile(format, tracks, ticks_per_qn);

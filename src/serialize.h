@@ -238,7 +238,6 @@ struct DataBuffer {
 			serialize(size);
 			if(size!=0){
 				if (size < 0) {
-					std::cout << size;
 					size = size * -2;
 					data.resize(size-2);
 					serialize((u8*)data.data(), size-2);
@@ -278,10 +277,6 @@ struct DataBuffer {
 					std::vector<uint8_t> utf16_bytes(reinterpret_cast<const uint8_t*>(utf16_str.data()), reinterpret_cast<const uint8_t*>(utf16_str.data() + utf16_str.size()));
 					utf16_bytes.push_back(0);
 					utf16_bytes.push_back(0);
-					for (uint8_t c : utf16_bytes) {
-						std::cout << std::to_string(c) + " ";
-					}
-					std::cout << "\n";
 					size = utf16_bytes.size()/2;
 					i32 newsize = 0 - size;
 					serialize(newsize);
@@ -302,7 +297,6 @@ struct DataBuffer {
 			serialize(size);
 			if (size != 0) {
 				if (size < 0) {
-					std::cout << size;
 					size = size * -2;
 					data.resize(size);
 					serialize((u8*)data.data(), size);
@@ -339,10 +333,6 @@ struct DataBuffer {
 					std::vector<uint8_t> utf16_bytes(reinterpret_cast<const uint8_t*>(utf16_str.data()), reinterpret_cast<const uint8_t*>(utf16_str.data() + utf16_str.size()));
 					utf16_bytes.push_back(0);
 					utf16_bytes.push_back(0);
-					for (uint8_t c : utf16_bytes) {
-						std::cout << std::to_string(c) + " ";
-					}
-					std::cout << "\n";
 					size = utf16_bytes.size() / 2;
 					i32 newsize = 0 - size;
 					serialize(newsize);
