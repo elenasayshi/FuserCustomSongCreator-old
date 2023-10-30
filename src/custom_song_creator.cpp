@@ -617,8 +617,8 @@ void display_main_properties() {
 	if (ImGui::Checkbox("Is Stream Optimized?", &root.isStreamOptimized))
 		unsavedChanges = true;
 	ImGui::SameLine();
-	HelpMarker("When checked, the song will show up under the 'Stream Optimized' category in the game. Most songs won't have this checked, but if the song falls under a license that would make it safe for streaming/videos, it can. Public Domain songs, in-house (original songs made by you), as well as some versions of the Creative Commons license would mean that the song can fall under this category.");
-}
+	HelpMarker("When checked, the song will show up under the 'Stream Optimized' category in the game. This means it falls under a license that would make it safe for streaming/videos. Public domain songs, original songs (in-house), and some versions of the Creative Commons license fall under this category. If you're unsure, leave this unchecked.");
+} 
 //#include "stb_image_write.h"
 
 void update_texture(std::string filepath, AssetLink<IconFileAsset> icon) {
@@ -772,6 +772,7 @@ void display_mogg_settings(FusionFileAsset& fusionFile, size_t idx, HmxAudio::Pa
 
 				mogg.fileData = std::move(outData);
 				fusionFile.playableMoggs[idx].oggData = std::move(fileData);
+				unsavedChanges = true;
 			}
 			else {
 				ImGui::OpenPopup("Ogg loading error");
@@ -1170,25 +1171,7 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 						}
 
 						auto&& fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionPackageFile->resourceHeader);
-						int isSingleNote = mfr.MFR_is_single_note();
-						if (!isRiser) {
-							if (maj) {
-								if (isSingleNote < 2) {
-									fusion.nodes.getInt("midi_isonenote_maj") = isSingleNote;
-								}
-								else {
-									fusion.nodes.getInt("midi_isonenote_maj") = 0;
-								}
-							}
-							else {
-								if (isSingleNote < 2) {
-									fusion.nodes.getInt("midi_isonenote_min") = isSingleNote;
-								}
-								else {
-									fusion.nodes.getInt("midi_isonenote_min") = 0;
-								}
-							}
-						}
+						mfr.is_single_note = mfr.MFR_is_single_note();
 
 					}
 					midiAsset.audio.audioFiles[0].resourceHeader = std::move(mfr);
@@ -1941,8 +1924,6 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 	auto&& midiAsset = std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value);
 	auto& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(midiAsset.audio.audioFiles[0].resourceHeader);
 
-	std::string midiText = mfr.minor ? "MINOR" : "MAJOR";
-	ImGui::Text(midiText.c_str());
 	ImGui::BeginChild("ChordTableHolder", ImVec2((windowSize.x / 3) - 15, oggWindowSize - 240));
 	if (ImGui::BeginTable("ChordTable", 2, 0, ImVec2((windowSize.x / 3) - 15, oggWindowSize - 240))) {
 		ImGui::TableSetupColumn("Beat", 0, 0.2);
@@ -2162,11 +2143,22 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 }
 
 void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMode) {
+	int disc_midi_maj_single;
+	int disc_midi_min_single; 
 	{
 		AssetLink<MidiSongAsset>* midiSong = &celData.minorAssets[0];
 		auto&& midi_file = midiSong->data.midiFile.data;
 		auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
 		mfr.minor = true;
+		mfr.is_single_note = mfr.MFR_is_single_note();
+		disc_midi_min_single = mfr.is_single_note;
+	}
+	{
+		AssetLink<MidiSongAsset>* midiSong = &celData.majorAssets[0];
+		auto&& midi_file = midiSong->data.midiFile.data;
+		auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
+		mfr.is_single_note = mfr.MFR_is_single_note();
+		disc_midi_maj_single = mfr.is_single_note;
 	}
 	ChooseFuserEnum<FuserEnums::Instrument>("Instrument", celData.instrument, false);
 	auto&& fusionFile = celData.majorAssets[0].data.fusionFile.data;
@@ -2180,8 +2172,7 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 
 
 	bool disc_advanced;
-	int disc_midi_maj_single;
-	int disc_midi_min_single;
+	
 	{
 		for (auto&& file : asset.audio.audioFiles) {
 			if (file.fileType == "FusionPatchResource") {
@@ -2197,7 +2188,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 
 
 		if (fusion.nodes.getChild("edit_advanced") == nullptr) {
-			unsavedChanges = true;
 			hmx_fusion_node label;
 			label.key = "edit_advanced";
 			label.value = 0;
@@ -2208,56 +2198,11 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 			disc_advanced = fusion.nodes.getInt("edit_advanced") == 1;
 		}
 
-		if (fusion.nodes.getChild("midi_isonenote_maj") == nullptr) {
-			unsavedChanges = true;
-			hmx_fusion_node node;
-			node.key = "midi_isonenote_maj";
-			AssetLink<MidiSongAsset>* midiSong = &celData.majorAssets[0];
-			auto&& midi_file = midiSong->data.midiFile.data;
-			auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
-			int isSingleNote = mfr.MFR_is_single_note();
-			if (isSingleNote < 2) {
-				node.value = isSingleNote;
-				disc_midi_maj_single = isSingleNote;
-			}
-			else {
-				node.value = 0;
-				disc_midi_min_single = 0;
-			}
-			fusion.nodes.children.insert(fusion.nodes.children.begin(), node);
-		}
-		else {
-			disc_midi_maj_single = fusion.nodes.getInt("midi_isonenote_maj");
-		}
-
-		if (fusion.nodes.getChild("midi_isonenote_min") == nullptr) {
-			unsavedChanges = true;
-			hmx_fusion_node node;
-			node.key = "midi_isonenote_min";
-			AssetLink<MidiSongAsset>* midiSong = &celData.minorAssets[0];
-			auto&& midi_file = midiSong->data.midiFile.data;
-			auto&& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value).audio.audioFiles[0].resourceHeader);
-			int isSingleNote = mfr.MFR_is_single_note();
-			if (isSingleNote < 2) {
-				node.value = isSingleNote;
-				disc_midi_min_single = isSingleNote;
-			}
-			else {
-				node.value = 0;
-				disc_midi_min_single = 0;
-			}
-			fusion.nodes.children.insert(fusion.nodes.children.begin() + 1, node);
-		}
-		else {
-			disc_midi_min_single = fusion.nodes.getInt("midi_isonenote_min");
-		}
-
 		int mapidx = 0;
 		for (auto c : map.children) {
 			auto nodes = std::get<hmx_fusion_nodes*>(c.value);
 			fusion_mogg_files.emplace(nodes->getString("sample_path"));
 			if (nodes->getChild("zone_label") == nullptr) {
-				unsavedChanges = true;
 				hmx_fusion_node label;
 				label.key = "zone_label";
 				if (mapidx == 0) {
@@ -2272,7 +2217,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 				nodes->children.insert(nodes->children.begin(), label);
 			}
 			if (nodes->getChild("keymap_preset") == nullptr) {
-				unsavedChanges = true;
 				hmx_fusion_node kmpreset;
 				kmpreset.key = "keymap_preset";
 				int nmin = nodes->getInt("min_note");
@@ -2348,7 +2292,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 
 
 		if (fusionRiser.nodes.getChild("edit_advanced") == nullptr) {
-			unsavedChanges = true;
 			hmx_fusion_node label;
 			label.key = "edit_advanced";
 			label.value = 0;
@@ -2364,7 +2307,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 			auto nodesRiser = std::get<hmx_fusion_nodes*>(c.value);
 			fusion_mogg_filesRiser.emplace(nodesRiser->getString("sample_path"));
 			if (nodesRiser->getChild("zone_label") == nullptr) {
-				unsavedChanges = true;
 				hmx_fusion_node label;
 				label.key = "zone_label";
 				if (mapidx == 0) {
@@ -2379,7 +2321,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 				nodesRiser->children.insert(nodesRiser->children.begin(), label);
 			}
 			if (nodesRiser->getChild("keymap_preset") == nullptr) {
-				unsavedChanges = true;
 				hmx_fusion_node kmpreset;
 				kmpreset.key = "keymap_preset";
 				int nmin = nodesRiser->getInt("min_note");
@@ -2680,6 +2621,7 @@ void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice) {
 std::string windowTitle = " No Song Loaded";
 void custom_song_creator_update(size_t width, size_t height) {
 	bool do_open = false;
+	bool do_open_2 = false;
 	bool do_save = false;
 	bool do_new = false;
 	bool open_preferences = false;
@@ -2858,19 +2800,35 @@ void custom_song_creator_update(size_t width, size_t height) {
 		}
 	}
 
+	if (ImGui::BeginPopupModal("Open without saving?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
+		ImGui::BeginChild("Text", ImVec2(420, 85));
+		ImGui::Text("Would you like to open a custom file without saving?");
+		ImGui::TextWrapped("WARNING: Any changes you have made will be lost unless you have saved.");
+		ImGui::EndChild();
+		ImGui::BeginChild("Buttons", ImVec2(420, 25));
+		if (ImGui::Button("Yes", ImVec2(120, 0)))
+		{
+			do_open = true;
+			ImGui::CloseCurrentPopup();
+			
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("No", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndChild();
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
 
 	if (do_open) {
-		auto file = OpenFile("Fuser Custom Song (*.pak)\0*.pak\0");
-		if (file) {
-			std::ifstream infile(*file, std::ios_base::binary);
-			std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
-
-			DataBuffer dataBuf;
-			dataBuf.setupVector(fileData);
-			load_file(std::move(dataBuf));
-
-			gCtx.saveLocation = *file;
-		}
+		if (unsavedChanges)
+			ImGui::OpenPopup("Confirm Open");
+		else
+			do_open_2 = true;
 	}
 
 	if (do_save && gCtx.currentPak != nullptr) {
@@ -2911,6 +2869,42 @@ void custom_song_creator_update(size_t width, size_t height) {
 		ImGui::EndChild();
 		ImGui::EndChild();
 		ImGui::EndPopup();
+	}
+	if (ImGui::BeginPopupModal("Confirm Open", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
+		ImGui::BeginChild("Text", ImVec2(420, 85));
+		ImGui::Text("Would you like to open a custom?");
+		ImGui::TextWrapped("WARNING: Any changes you have made will be lost unless you have saved.");
+		ImGui::EndChild();
+		ImGui::BeginChild("Buttons", ImVec2(420, 25));
+		if (ImGui::Button("Yes", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+			do_open_2 = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("No", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndChild();
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
+
+	if (do_open_2) {
+		auto file = OpenFile("Fuser Custom Song (*.pak)\0*.pak\0");
+		if (file) {
+			std::ifstream infile(*file, std::ios_base::binary);
+			std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
+
+			DataBuffer dataBuf;
+			dataBuf.setupVector(fileData);
+			load_file(std::move(dataBuf));
+
+			gCtx.saveLocation = *file;
+		}
 	}
 
 	if (gCtx.currentPak != nullptr) {

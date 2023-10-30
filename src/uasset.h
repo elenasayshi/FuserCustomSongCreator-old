@@ -935,6 +935,7 @@ struct HmxAudio {
 		};
 
 		struct MidiFileResource {
+			bool is_single_note = true;
 			bool minor = false;
 			std::vector<std::string> minorChords = { "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "b2" };
 			std::vector<std::string> majorChords = { "1", "2m", "3m", "4", "5", "6m", "b2" };
