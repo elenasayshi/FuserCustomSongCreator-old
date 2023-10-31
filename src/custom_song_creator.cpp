@@ -43,6 +43,24 @@ bool endsWith(const std::string& str, const std::string& suffix) {
 	}
 }
 
+std::string formatFloatString(std::string& input, int numDecimalPlaces) {
+	// Find the position of the decimal point
+	size_t decimalPos = input.find('.');
+
+	if (decimalPos != std::string::npos) {
+		// Ensure that there are at least numDecimalPlaces characters after the decimal point
+		size_t requiredLength = decimalPos + 1 + numDecimalPlaces;
+		if (input.length() < requiredLength) {
+			// Pad the string with zeros if necessary
+			input.append(requiredLength - input.length(), '0');
+		}
+		return input.substr(0, requiredLength);
+	}
+
+	// If there's no decimal point, return the input as is
+	return input;
+}
+
 struct AudioCtx {
 	HSAMPLE currentMusic = 0;
 	int currentDevice = -1;
@@ -709,7 +727,7 @@ int curPickup = -1;
 int curChord = -1;
 float pickupInput = 0;
 float chordInput = 0;
-
+int chordInputTicks = 0;
 std::string moggName(std::string inName) {
 	return inName.substr(3, inName.length() - 8);
 }
@@ -1406,6 +1424,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 		curChord = -1;
 		pickupInput = 0;
 		chordInput = 0;
+		chordInputTicks = 0;
 		lastCelTab = curCelTab + curCelTabOffset;
 	}
 
@@ -1942,9 +1961,10 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn();
-				if (ImGui::Selectable(std::to_string(mfr.chords[i].start / 480).c_str(), curChord == i)) {
+				
+				if (ImGui::Selectable(formatFloatString(std::to_string(mfr.chords[i].start / 480.0F),2).c_str(), curChord == i)) {
 					curChord = i;
-					chordInput = mfr.chords[i].start / 480;
+					chordInput = mfr.chords[i].start / 480.0F;
 				}
 				ImGui::TableNextColumn();
 
@@ -1996,30 +2016,31 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 
 
 	ImGui::BeginChild("ChordsButtons", ImVec2(windowSize.x / 3, 145));
-	if (ImGui::InputFloat("Chord Beat", &chordInput, 0.0F, 0.0F, "%.2f")) {
+	if (ImGui::InputFloat("Chord Beat", &chordInput, 0.0F, 0.0F, "%.2f", ImGuiInputTextFlags_CharsDecimal)) {
 		chordInput = std::round(std::clamp(chordInput, 0.0F, celData.tickLength / 480.0F) * 100) / 100;
+		chordInputTicks = chordInput * 480;
 	}
 	if (ImGui::Button("Add Chord")) {
 		unsavedChanges = true;
 		chordInput = std::round(std::clamp(chordInput, 0.0F, celData.tickLength / 480.0F) * 100) / 100;
-		
+		chordInputTicks = chordInput * 480;
 		if (mfr.chords.size() > 0) {
 			bool chordExists = false;
 			for (int i = 0; i < mfr.chords.size(); i++) {
-				if (mfr.chords[i].start == (int)(chordInput * 480)) {
+				if (mfr.chords[i].start == chordInputTicks) {
 					chordExists = true;
 					break;
 				}
 			}
 			if (!chordExists) {
 				HmxAudio::PackageFile::MidiFileResource::Chord newChord;
-				newChord.start = (int)(chordInput * 480);
+				newChord.start = chordInputTicks;
 				newChord.end = newChord.start + 1;
 				newChord.name = minor ? "1m" : "1";
 				mfr.chords.emplace_back(newChord);
 				std::sort(mfr.chords.begin(), mfr.chords.end(), compareChords);
 				for (int i = 0; i < mfr.chords.size(); i++) {
-					if (mfr.chords[i].start == (int)(chordInput * 480)) {
+					if (mfr.chords[i].start == chordInputTicks) {
 						curChord = i;
 						break;
 					}
@@ -2028,7 +2049,7 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 		}
 		else {
 			HmxAudio::PackageFile::MidiFileResource::Chord newChord;
-			newChord.start = (int)(chordInput * 480);
+			newChord.start = chordInputTicks;
 			newChord.end = mfr.final_tick;
 			newChord.name = minor ? "1m" : "1";
 			mfr.chords.emplace_back(newChord);
@@ -2039,22 +2060,23 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 	if (ImGui::Button("Update Chord Beat") && mfr.chords.size() > 0) {
 		unsavedChanges = true;
 		chordInput = std::round(std::clamp(chordInput, 0.0F, celData.tickLength / 480.0F) * 100) / 100;
+		chordInputTicks = chordInput * 480;
 		if (mfr.chords.size() == 1) {
-			mfr.chords[curChord].start = (int)(chordInput * 480);
+			mfr.chords[curChord].start = chordInputTicks;
 		}
 		else {
 			bool chordExists = false;
 			for (int i = 0; i < mfr.chords.size(); i++) {
-				if (mfr.chords[i].start == (int)(chordInput * 480)) {
+				if (mfr.chords[i].start == chordInputTicks) {
 					chordExists = true;
 					break;
 				}
 			}
 			if (!chordExists) {
-				mfr.chords[curChord].start = (int)(chordInput * 480);
+				mfr.chords[curChord].start = chordInputTicks;
 				std::sort(mfr.chords.begin(), mfr.chords.end(), compareChords);
 				for (int i = 0; i < mfr.chords.size(); i++) {
-					if (mfr.chords[i].start == (int)(chordInput * 480)) {
+					if (mfr.chords[i].start == chordInputTicks) {
 						curChord = i;
 						break;
 					}
@@ -2418,7 +2440,7 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 					}
 					ImGui::EndChild();
 					ImGui::BeginChild("PickupButtons", ImVec2(windowSize.x / 3, 145));
-					if (ImGui::InputFloat("Pickup Beat", &pickupInput, 0.0F, 0.0F, "%.2f")) {
+					if (ImGui::InputFloat("Pickup Beat", &pickupInput, 0.0F, 0.0F, "%.2f", ImGuiInputTextFlags_CharsDecimal)) {
 						pickupInput = std::round(std::clamp(pickupInput, 0.0F, 128.0F) * 100) / 100;
 					}
 					if (ImGui::Button("Add Pickup")) {
