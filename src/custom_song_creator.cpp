@@ -1072,6 +1072,7 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 }
 bool midi_error = false;
 std::string mfrError;
+std::string last_import_midi;
 void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio::PackageFile*& fusionPackageFile, std::vector<HmxAudio::PackageFile*>& moggFiles, bool disc_advanced, int disc_midi_maj_single, int disc_midi_min_single, bool isRiser = false)
 {
 	ImVec2 btnHolderSize = ImVec2(ImGui::GetContentRegionAvail().x / 2, 30);
@@ -1118,7 +1119,6 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 	ImGui::Text("Overwrite MIDI");
 	bool overwrite_midi = false;
 	bool maj = true;
-	midi_error = false;
 	ImGui::BeginChild("btnL2", btnHolderSize);
 	if (ImGui::Button("Major##OVERWRITEMAJOR", btnHolderSize)) {
 		overwrite_midi = true;
@@ -1175,8 +1175,11 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 
 					}
 					midiAsset.audio.audioFiles[0].resourceHeader = std::move(mfr);
+					midi_error = false;
+					mfrError = "";
 				}
 				else {
+					last_import_midi = celData.type.getString() + (isRiser ? " Riser" : " Disc") + (maj ? " Major" : " Minor" );
 					midi_error = true;
 					if (mfr.magic == 0) {
 						mfrError = "MIDI file does not contain 'samplemidi' track";
@@ -1189,13 +1192,16 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 			}
 		}
 		catch (const std::exception& ex) {
+			last_import_midi = celData.type.getString() + (isRiser ? " Riser" : " Disc") + (maj ? " Major" : " Minor");
 			midi_error = true;
 			mfrError = ex.what();
 		}
 		
 
 	}
-
+	if (midi_error) {
+		ImGui::TextWrapped(("Error importing " + last_import_midi + " MIDI: " + mfrError).c_str());
+	}
 	ImGui::Spacing();
 
 	ImGui::Text("Export MIDI");
@@ -2384,26 +2390,6 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 			if (ImGui::BeginTabBar("DiscAdvancedTabs")) {
 				if (ImGui::BeginTabItem("Fusion/MIDI")) {
 					display_fusionmidisettings(asset, celData, fusionPackageFile, moggFiles, disc_advanced, disc_midi_maj_single, disc_midi_min_single);
-					if (midi_error) {
-						if (ImGui::BeginPopupModal("MIDI Error", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-						{
-							ImGui::PopStyleColor();
-							ImGui::BeginChild("Text", ImVec2(420, 69));
-							ImGui::TextWrapped(mfrError.c_str());
-							ImGui::EndChild();
-							ImGui::BeginChild("Buttons", ImVec2(420, 25));
-							if (ImGui::Button("OK", ImVec2(120, 0)))
-							{
-								ImGui::CloseCurrentPopup();
-							}
-							ImGui::EndChild();
-
-
-							ImGui::EndPopup();
-							ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2, 0.2, 0.2, 1));
-						}
-
-					}
 					ImGui::EndTabItem();
 				}
 				if (ImGui::BeginTabItem("Pickups")) {
@@ -3004,7 +2990,13 @@ void custom_song_creator_update(size_t width, size_t height) {
 		ImGui::BeginChild("Buttons", ImVec2(600, 25));
 		if (ImGui::Button("OK", ImVec2(200, 0)))
 		{
-			fcsc_cfg.saveConfig(fcsc_cfg.path);
+			if (fcsc_cfg.defaultShortName.length() > 0) {
+				fcsc_cfg.saveConfig(fcsc_cfg.path);
+			}
+			else {
+				fcsc_cfg.defaultShortName = "custom_song";
+				fcsc_cfg.saveConfig(fcsc_cfg.path);
+			}
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -3015,7 +3007,14 @@ void custom_song_creator_update(size_t width, size_t height) {
 		ImGui::SameLine();
 		if (ImGui::Button("Apply", ImVec2(200, 0)))
 		{
-			fcsc_cfg.saveConfig(fcsc_cfg.path);
+			if (fcsc_cfg.defaultShortName.length() > 0) {
+				fcsc_cfg.saveConfig(fcsc_cfg.path);
+			}
+			else {
+				fcsc_cfg.defaultShortName = "custom_song";
+				fcsc_cfg.saveConfig(fcsc_cfg.path);
+			}
+			
 		}
 		ImGui::EndChild();
 
