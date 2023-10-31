@@ -13,12 +13,13 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-
+#include <ShlObj.h>
 #include <iostream>
 #include <fstream>
-
+#include <string>
+#include <filesystem>
 #include "bass/bass.h"
-
+#include "configfile.h"
 #include <vector>
 
 // Data
@@ -41,9 +42,12 @@ size_t window_height = 800;
 extern void custom_song_creator_update(size_t width, size_t height);
 extern void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice);
 extern void initAudio();
+bool unsavedChanges=false;
+extern bool closePressed;
 HWND G_hwnd;
 
 
+ConfigFile fcsc_cfg;
 // Main code
 int __stdcall WinMain(
     HINSTANCE hInstance,
@@ -120,7 +124,7 @@ int __stdcall WinMain(
     ImFont* fontcsc = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f,&config,io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
     ImFont* fontctr = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msjh.ttc", 16.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
     ImFont* fontkor = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\malgun.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesKorean());
-    ImFont* fontjpn = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\Simhei.ttf", 16.0f, &config, io.Fonts->GetGlyphRangesJapanese());
+    ImFont* fontjpn = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\YuGothR.ttc", 16.0f, &config, io.Fonts->GetGlyphRangesJapanese());
     if(font0!=NULL && fontcsc!=NULL && fontctr!=NULL && fontkor!=NULL && fontjpn!=NULL)
         io.Fonts->Build();
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
@@ -135,7 +139,24 @@ int __stdcall WinMain(
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
-    
+    PWSTR appDataPath = nullptr;
+    if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appDataPath) == S_OK)
+    {
+        std::wstring appDataFolderPath(appDataPath);
+        CoTaskMemFree(appDataPath);
+
+        // Define your configuration folder path.
+        std::wstring configFolder = appDataFolderPath + L"\\FuserCustomsCreator";
+        std::wstring configFile = configFolder + L"\\config";
+        fcsc_cfg.path = configFile;
+        // Create the configuration folder if it doesn't exist.
+        if (!CreateDirectoryW(configFolder.c_str(), NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+        {
+            
+        }
+        fcsc_cfg.loadConfig(configFile);
+    }
+
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
     while (msg.message != WM_QUIT)
@@ -249,6 +270,16 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
     switch (msg)
     {
+    case WM_CLOSE:
+        if (unsavedChanges)
+        {
+            closePressed = true;
+        }
+        else
+        {
+            DestroyWindow(hWnd);
+        }
+        return 0;
     case WM_SIZE:
         if (g_pd3dDevice != NULL && wParam != SIZE_MINIMIZED)
         {

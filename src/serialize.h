@@ -221,7 +221,16 @@ struct DataBuffer {
 			serialize(data[i]);
 		}
 	}
+	template<typename T>
+	void serializeWithSize_nonull(std::vector<T>& data, i32 size) {
+		if (loading) {
+			data.resize(size);
+		}
 
+		for (i32 i = 0; i < size; ++i) {
+			serialize_nonull(data[i]);
+		}
+	}
 	void serialize(std::string& data) {
 		if (loading) {
 			i32 size = (i32)data.size();
@@ -229,7 +238,6 @@ struct DataBuffer {
 			serialize(size);
 			if(size!=0){
 				if (size < 0) {
-					std::cout << size;
 					size = size * -2;
 					data.resize(size-2);
 					serialize((u8*)data.data(), size-2);
@@ -269,10 +277,6 @@ struct DataBuffer {
 					std::vector<uint8_t> utf16_bytes(reinterpret_cast<const uint8_t*>(utf16_str.data()), reinterpret_cast<const uint8_t*>(utf16_str.data() + utf16_str.size()));
 					utf16_bytes.push_back(0);
 					utf16_bytes.push_back(0);
-					for (uint8_t c : utf16_bytes) {
-						std::cout << std::to_string(c) + " ";
-					}
-					std::cout << "\n";
 					size = utf16_bytes.size()/2;
 					i32 newsize = 0 - size;
 					serialize(newsize);
@@ -283,6 +287,62 @@ struct DataBuffer {
 					serialize((u8*)data.data(), size);
 				}
 				
+			}
+		}
+	}
+	void serialize_nonull(std::string& data) {
+		if (loading) {
+			i32 size = (i32)data.size();
+			i32 origSize = (i32)data.size();
+			serialize(size);
+			if (size != 0) {
+				if (size < 0) {
+					size = size * -2;
+					data.resize(size);
+					serialize((u8*)data.data(), size);
+					std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+					data = converter.to_bytes(
+						std::wstring(reinterpret_cast<const wchar_t*>(data.data()),
+							data.length() / sizeof(wchar_t)));
+				}
+				else {
+					data.resize(size);
+					serialize((u8*)data.data(), size);
+				}
+
+			}
+
+		}
+		else {
+			if (data.size() == 0) {
+				u32 null = 0;
+				serialize(null);
+			}
+			else {
+				i32 size = data.size();
+				bool isUtf16 = false;
+				for (char c : data) {
+					if (c & 0x80) {
+						isUtf16 = true;
+					}
+				}
+				if (isUtf16) {
+					std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
+
+					std::u16string utf16_str = converter.from_bytes(data);
+					std::vector<uint8_t> utf16_bytes(reinterpret_cast<const uint8_t*>(utf16_str.data()), reinterpret_cast<const uint8_t*>(utf16_str.data() + utf16_str.size()));
+					utf16_bytes.push_back(0);
+					utf16_bytes.push_back(0);
+					size = utf16_bytes.size() / 2;
+					i32 newsize = 0 - size;
+					serialize(newsize);
+					serialize((u8*)utf16_bytes.data(), size * 2);
+				}
+				else {
+					serialize(size);
+					serialize((u8*)data.data(), size);
+				}
+
 			}
 		}
 	}

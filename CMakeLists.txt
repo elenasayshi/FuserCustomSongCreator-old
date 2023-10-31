@@ -6,6 +6,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 file(GLOB SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/res/resource.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/configfile.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/stream-helpers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/stream-helpers.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SMF.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SMF.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/uasset.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/fuser_asset.cpp
@@ -18,7 +24,6 @@ file(GLOB SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DDSFile.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/stb_image.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/stb_image_resize.h
-
 
     ${CMAKE_CURRENT_SOURCE_DIR}/moggcrypt/aes.c
     ${CMAKE_CURRENT_SOURCE_DIR}/moggcrypt/CCallbacks.cpp
@@ -41,11 +46,12 @@ add_executable( ${PROJECT_NAME} WIN32 ${SRCS} )
 target_include_directories(Fuser_CustomSongCreator PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/")
 target_include_directories(Fuser_CustomSongCreator PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/imgui/")
 target_include_directories(Fuser_CustomSongCreator PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/")
-
+target_sources(Fuser_CustomSongCreator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/res/Fuser_CustomSongCreator.rc")
 target_link_libraries(
     Fuser_CustomSongCreator
+    "shlwapi.lib"
     "d3d11.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/bass/bass.lib"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bass/bass.lib"
 )
 
 set_property(TARGET Fuser_CustomSongCreator PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
