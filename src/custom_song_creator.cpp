@@ -539,6 +539,30 @@ void load_template() {
 	gCtx.currentPak.get()->root.shortName = fcsc_cfg.defaultShortName;
 }
 
+void write_sig(DataBuffer outBuf, std::string outPath) {
+	PakSigFile sigFile;
+	sigFile.encrypted_total_hash.resize(512);
+
+	const u32 chunkSize = 64 * 1024;
+	for (size_t start = 0; start < outBuf.size; start += chunkSize) {
+		size_t end = start + chunkSize;
+		if (end > outBuf.size) {
+			end = outBuf.size;
+		}
+
+		sigFile.chunks.emplace_back(CRC::MemCrc32(outBuf.buffer + start, end - start));
+	}
+
+	std::vector<u8> sigOutData;
+	DataBuffer sigOutBuf;
+	sigOutBuf.setupVector(sigOutData);
+	sigOutBuf.loading = false;
+	sigFile.serialize(sigOutBuf);
+	sigOutBuf.finalize();
+
+	std::ofstream outPak(outPath, std::ios_base::binary);
+	outPak.write((char*)sigOutBuf.buffer, sigOutBuf.size);
+}
 void save_file() {
 	SongSerializationCtx ctx;
 	ctx.loading = false;
@@ -556,33 +580,12 @@ void save_file() {
 	std::string basePath = fs::path(gCtx.saveLocation).parent_path().string() + "/";
 	std::ofstream outPak(basePath + gCtx.currentPak->root.shortName + "_P.pak", std::ios_base::binary);
 	outPak.write((char*)outBuf.buffer, outBuf.size);
-
-	{
-		PakSigFile sigFile;
-		sigFile.encrypted_total_hash.resize(512);
-
-		const u32 chunkSize = 64 * 1024;
-		for (size_t start = 0; start < outBuf.size; start += chunkSize) {
-			size_t end = start + chunkSize;
-			if (end > outBuf.size) {
-				end = outBuf.size;
-			}
-
-			sigFile.chunks.emplace_back(CRC::MemCrc32(outBuf.buffer + start, end - start));
-		}
-
-		std::vector<u8> sigOutData;
-		DataBuffer sigOutBuf;
-		sigOutBuf.setupVector(sigOutData);
-		sigOutBuf.loading = false;
-		sigFile.serialize(sigOutBuf);
-		sigOutBuf.finalize();
-
-		std::ofstream outPak(basePath + gCtx.currentPak->root.shortName + "_P.sig", std::ios_base::binary);
-		outPak.write((char*)sigOutBuf.buffer, sigOutBuf.size);
-	}
+	
+	write_sig(outBuf, basePath + gCtx.currentPak->root.shortName + "_P.sig");
+	
 	unsavedChanges = false;
 }
+
 
 bool Error_InvalidFileName = false;
 void select_save_location() {
@@ -2738,6 +2741,29 @@ void custom_song_creator_update(size_t width, size_t height) {
 					auto&& fileData = midiAsset.audio.audioFiles[0].fileData;
 					return fileData;
 					};
+			}
+
+			if (ImGui::MenuItem("Generate .sig file")) {
+				auto file = OpenFile("Unreal Pak File (*.pak)\0*.pak\0");
+				if (file) {
+					std::string path = *file;
+					size_t lastDot = path.find_last_of('.'); 
+					std::string sigPath;
+					if (lastDot != std::string::npos)
+						sigPath = path.substr(0, lastDot) + ".sig";
+					else
+						sigPath = path + ".sig";
+					std::ifstream inFile(path, std::ios::binary);
+					// Read the file into the vector
+					std::vector<u8> fileData;
+					uint8_t byte;
+					while (inFile.read(reinterpret_cast<char*>(&byte), sizeof(uint8_t)))
+						fileData.push_back(byte);
+					DataBuffer outBuf;
+					outBuf.setupVector(fileData);
+					write_sig(outBuf, sigPath);
+				}
+				
 			}
 
 			if (ImGui::MenuItem("Extract Fusion From uexp")) {

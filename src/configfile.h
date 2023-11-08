@@ -32,10 +32,8 @@ struct ConfigFile {
                         // Null terminator encountered, process the value
                         if (curRead == "NONE") {
                             curRead = value;
-                            std::cout << "Currently reading value " + curRead + ": ";
                         }
                         else {
-                            std::cout << value << std::endl;
                             if (curRead == "usePercVel") {
                                 if (value == "0")
                                     usePercentVelocity = false;

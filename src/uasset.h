@@ -1193,6 +1193,7 @@ struct HmxAudio {
 				if (chordsTrack_idx > -1) {
 					tracks.erase(tracks.begin() + chordsTrack_idx);
 				}
+				std::cout << chordsTrack_idx << std::endl;
 				if (chords.size() > 0) {
 					MFRTrack chordsTrack;
 					chordsTrack.unk0 = 1;
@@ -1214,7 +1215,6 @@ struct HmxAudio {
 					trackNameEvent.tick = 0;
 					chordsTrack.events.emplace_back(trackNameEvent);
 					for (auto& chd : chords) {
-						std::cout << minor << std::endl;
 						if (minor) {
 							if (std::find(minorChords.begin(), minorChords.end(), chd.name) == minorChords.end()) {
 								if (chd.name == "1")
@@ -1276,6 +1276,7 @@ struct HmxAudio {
 
 				if (!buffer.loading) {
 					updateChords();
+					num_tracks = tracks.size();
 				}
 				buffer.serialize(magic);
 				buffer.serialize(last_tick);
@@ -1356,7 +1357,6 @@ struct HmxAudio {
 							}
 							else if (outData.type == (u8)EventType::PitchBend) {
 								outMidiEvent.bend = (u16)((outData.note<<8) | outData.velocity );
-								std::cout << "PBOUT " << pbidx <<": " << outMidiEvent.bend<<", (" << (int)outData.note << ", " << (int)outData.velocity <<")"<< std::endl;
 								pbidx++;
 							}
 							else {
@@ -1516,7 +1516,6 @@ struct HmxAudio {
 								u16 tempBend = mEvent.bend;
 								mfrMidi.note = (mEvent.bend >> 8) & 0x7F;
 								mfrMidi.velocity = mEvent.bend & 0x7F;
-								std::cout << "PBIN " << pbidx << ": " << mEvent.bend << ", (" << (int)mfrMidi.note << ", " << (int)mfrMidi.velocity << ")" << std::endl;
 								pbidx++;
 							}
 							else {
@@ -1639,7 +1638,6 @@ struct HmxAudio {
 						}
 					}
 				}
-				std::cout << std::endl;
 				return 2;
 			}
 		};
