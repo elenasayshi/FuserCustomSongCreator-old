@@ -937,8 +937,7 @@ struct HmxAudio {
 		struct MidiFileResource {
 			bool is_single_note = true;
 			bool minor = false;
-			std::vector<std::string> minorChords = { "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "b2" };
-			std::vector<std::string> majorChords = { "1", "2m", "3m", "4", "5", "6m", "b2" };
+			std::vector<std::string> chordList = { "1", "1m", "2m", "2mb5", "3m", "b3", "4", "4m", "5", "5m", "6m", "b6", "b7", "b2" };
 			struct MFRTrack {
 				u32 trackname_str_idx;
 
@@ -1200,12 +1199,7 @@ struct HmxAudio {
 					chordsTrack.unk1 = -1;
 					chordsTrack.strings.emplace_back("chords");
 					chordsTrack.trackname_str_idx = 0;
-					if (minor) {
-						chordsTrack.strings.insert(chordsTrack.strings.end(), minorChords.begin(), minorChords.end());
-					}
-					else {
-						chordsTrack.strings.insert(chordsTrack.strings.end(), majorChords.begin(), majorChords.end());
-					}
+					chordsTrack.strings.insert(chordsTrack.strings.end(), chordList.begin(), chordList.end());
 					MFRTrack::MFREvent trackNameEvent;
 					MFRTrack::MFREvent::EventData_Meta trackNameData;
 					trackNameData.type = 3;
@@ -1215,44 +1209,6 @@ struct HmxAudio {
 					trackNameEvent.tick = 0;
 					chordsTrack.events.emplace_back(trackNameEvent);
 					for (auto& chd : chords) {
-						if (minor) {
-							if (std::find(minorChords.begin(), minorChords.end(), chd.name) == minorChords.end()) {
-								if (chd.name == "1")
-									chd.name = "1m";
-								else if (chd.name == "2m")
-									chd.name = "2mb5";
-								else if (chd.name == "3m")
-									chd.name = "b3";
-								else if (chd.name == "4")
-									chd.name = "4m";
-								else if (chd.name == "5")
-									chd.name = "5m";
-								else if (chd.name == "6m")
-									chd.name = "b6";
-								else {
-									chd.name = "1m";
-								}
-							}
-						}
-						else {
-							if (std::find(majorChords.begin(), majorChords.end(), chd.name) == majorChords.end()) {
-								if (chd.name == "1m")
-									chd.name = "1";
-								else if (chd.name == "2mb5")
-									chd.name = "2m";
-								else if (chd.name == "b3")
-									chd.name = "3m";
-								else if (chd.name == "4m")
-									chd.name = "4";
-								else if (chd.name == "5m" || chd.name == "b7")
-									chd.name = "5";
-								else if (chd.name == "b6")
-									chd.name = "6m";
-								else {
-									chd.name = "1";
-								}
-							}
-						}
 						MFRTrack::MFREvent chdEvent;
 						MFRTrack::MFREvent::EventData_Meta chdData;
 						for (int i = 0; i < chordsTrack.strings.size(); i++) {

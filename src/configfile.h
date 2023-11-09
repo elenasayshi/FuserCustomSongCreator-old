@@ -9,6 +9,7 @@
 struct ConfigFile {
     std::wstring path;
     bool usePercentVelocity = false;
+    bool oppositeChordsAfterCurMode = true;
     std::string defaultShortName = "custom_song";
     void saveConfig(const std::wstring& configFile) {
         std::ofstream outFile(configFile, std::ios_base::binary);
@@ -17,6 +18,8 @@ struct ConfigFile {
         outFile.write("defaultShortName\x00", 17);
         outFile.write(defaultShortName.c_str(), strlen(defaultShortName.c_str()));
         outFile.write("\x00",1);
+        outFile.write("oppositeChordsAfterCurMode\x00", 27);
+        outFile.write(oppositeChordsAfterCurMode ? "1\x00" : "0\x00", 2);
         outFile.close();
     }
     void loadConfig(const std::wstring& configFile) {
@@ -41,8 +44,15 @@ struct ConfigFile {
                                     usePercentVelocity = true;
                                 curRead = "NONE";
                             }
-                            if (curRead == "defaultShortName") {
+                            else if (curRead == "defaultShortName") {
                                 defaultShortName = value;
+                                curRead = "NONE";
+                            }
+                            else if (curRead == "oppositeChordsAfterCurMode") {
+                                if (value == "0")
+                                    oppositeChordsAfterCurMode = false;
+                                else
+                                    oppositeChordsAfterCurMode = true;
                                 curRead = "NONE";
                             }
                         }

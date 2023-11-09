@@ -1354,56 +1354,41 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 	}
 	
 }
-const char* chordNamesMinor[] = { "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "b2" };
-const char* chordNamesMajor[] = { "1", "2m", "3m", "4", "5", "6m", "b2" };
-
+const char* chordNamesMinorMajor[] = { "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "sep", "1", "2m", "3m", "4", "5", "6m", "sep", "b2" };
+const char* chordNamesMajorMinor[] = { "1", "2m", "3m", "4", "5", "6m", "sep", "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "sep", "b2" };
+const char* chordNamesInterleaved[] = { "1", "1m", "2m", "2mb5", "3m", "b3", "4", "4m", "5", "5m", "6m", "b6", "b7", "b2" };
 std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> convertChordsMode(std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> chords, bool minor) {
 	for (auto& chd : chords) {
-		bool needsConvert = true;
-		if (minor) {
-			for (auto minchd : chordNamesMinor) {
-				if (chd.name == minchd)
-					needsConvert = false;
-			}
-			if(needsConvert){
-				if (chd.name == "1")
-					chd.name = "1m";
-				else if (chd.name == "2m")
-					chd.name = "2mb5";
-				else if (chd.name == "3m")
-					chd.name = "b3";
-				else if (chd.name == "4")
-					chd.name = "4m";
-				else if (chd.name == "5")
-					chd.name = "5m";
-				else if (chd.name == "6m")
-					chd.name = "b6";
-				else {
-					chd.name = "1m";
-				}
-			}
-		}
+		if (chd.name == "1")
+			chd.name = "1m";
+		else if (chd.name == "1m")
+			chd.name = "1";
+		else if (chd.name == "2m")
+			chd.name = "2mb5";
+		else if (chd.name == "2mb5")
+			chd.name = "2m";
+		else if (chd.name == "3m")
+			chd.name = "b3";
+		else if (chd.name == "b3")
+			chd.name = "3m";
+		else if (chd.name == "4")
+			chd.name = "4m";
+		else if (chd.name == "4m")
+			chd.name = "4";
+		else if (chd.name == "5m" || chd.name == "b7")
+			chd.name = "5";
+		else if (chd.name == "5")
+			chd.name = "5m";
+		else if (chd.name == "b6")
+			chd.name = "6m";
+		else if (chd.name == "6m")
+			chd.name = "b6";
 		else {
-			for (auto majchd : chordNamesMajor) {
-				if (chd.name == majchd)
-					needsConvert = false;
-			}
-			if (needsConvert) {
-				if (chd.name == "1m")
+			if (chd.name != "b2") {
+				if (minor)
+					chd.name = "1m";
+				else
 					chd.name = "1";
-				else if (chd.name == "2mb5")
-					chd.name = "2m";
-				else if (chd.name == "b3")
-					chd.name = "3m";
-				else if (chd.name == "4m")
-					chd.name = "4";
-				else if (chd.name == "5m" || chd.name == "b7")
-					chd.name = "5";
-				else if (chd.name == "b6")
-					chd.name = "6m";
-				else {
-					chd.name = "1";
-				}
 			}
 		}
 	}
@@ -1455,7 +1440,6 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 			auto&& midi_file = midiSong->data.midiFile.data;
 			auto&& midiAsset = std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value);
 			auto& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(midiAsset.audio.audioFiles[0].resourceHeader);
-			mfr.chords = convertChordsMode(mfr.chords, false);
 		}
 
 		{
@@ -1463,7 +1447,6 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 			auto&& midi_file = midiSong->data.midiFile.data;
 			auto&& midiAsset = std::get<HmxAssetFile>(midi_file.file.e->getData().data.catagoryValues[0].value);
 			auto& mfr = std::get<HmxAudio::PackageFile::MidiFileResource>(midiAsset.audio.audioFiles[0].resourceHeader);
-			mfr.chords=convertChordsMode(mfr.chords, true);
 		}
 		
 	}
@@ -1973,38 +1956,106 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 
 				// Use ImGui::Combo for the dropdown with chord names
 				int selectedChordIndex = -1;
-				if (minor) {
-					for (int j = 0; j < IM_ARRAYSIZE(chordNamesMinor); j++) {
-						if (mfr.chords[i].name == chordNamesMinor[j]) {
-							selectedChordIndex = j;
-							break;
+				if (fcsc_cfg.oppositeChordsAfterCurMode) {
+					if (minor) {
+						for (int j = 0; j < IM_ARRAYSIZE(chordNamesMinorMajor); j++) {
+							if (mfr.chords[i].name == chordNamesMinorMajor[j]) {
+								selectedChordIndex = j;
+								break;
+							}
+						}
+					}
+					else {
+						for (int j = 0; j < IM_ARRAYSIZE(chordNamesMajorMinor); j++) {
+							if (mfr.chords[i].name == chordNamesMajorMinor[j]) {
+								selectedChordIndex = j;
+								break;
+							}
 						}
 					}
 				}
 				else {
-					for (int j = 0; j < IM_ARRAYSIZE(chordNamesMajor); j++) {
-						if (mfr.chords[i].name == chordNamesMajor[j]) {
+					for (int j = 0; j < IM_ARRAYSIZE(chordNamesInterleaved); j++) {
+						if (mfr.chords[i].name == chordNamesInterleaved[j]) {
 							selectedChordIndex = j;
 							break;
 						}
 					}
 				}
+
+				
 				
 				if (selectedChordIndex == -1) {
 					selectedChordIndex = 0; // Default to the first chord if not found
 				}
 				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2)); // Adjust padding as needed
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0)); // No spacing
-				if (minor) {
-					if (ImGui::Combo(("##ChordCombo" + std::to_string(i)).c_str(), &selectedChordIndex, chordNamesMinor, IM_ARRAYSIZE(chordNamesMinor))) {
-						unsavedChanges = true;
-						mfr.chords[i].name = chordNamesMinor[selectedChordIndex];
+				if (fcsc_cfg.oppositeChordsAfterCurMode) {
+					if (minor) {
+						if (ImGui::BeginCombo(("##ChordCombo" + std::to_string(i)).c_str(), chordNamesMinorMajor[selectedChordIndex])) {
+							for (int k = 0; k < IM_ARRAYSIZE(chordNamesMinorMajor); ++k)
+							{
+								
+								bool is_selected = (selectedChordIndex == k);
+								if (chordNamesMinorMajor[k] == "sep") {
+									float separatorPadding = 2.0f; // Adjust the padding value as needed
+									float originalCursorPosY = ImGui::GetCursorPosY();
+
+									ImGui::SetCursorPosY(originalCursorPosY + separatorPadding);
+									ImGui::Separator();
+
+									ImGui::SetCursorPosY(originalCursorPosY + separatorPadding + separatorPadding);
+								}
+								else {
+									if (ImGui::Selectable(chordNamesMinorMajor[k], is_selected))
+									{
+										selectedChordIndex = k;
+										mfr.chords[i].name = chordNamesMinorMajor[selectedChordIndex];
+									}
+									if (is_selected)
+									{
+										ImGui::SetItemDefaultFocus();
+									}
+								}
+							}
+							ImGui::EndCombo();
+						}
+					}
+					else {
+						if (ImGui::BeginCombo(("##ChordCombo" + std::to_string(i)).c_str(), chordNamesMajorMinor[selectedChordIndex])) {
+							for (int k = 0; k < IM_ARRAYSIZE(chordNamesMajorMinor); ++k)
+							{
+
+								bool is_selected = (selectedChordIndex == k);
+								if (chordNamesMajorMinor[k] == "sep") {
+									float separatorPadding = 2.0f; // Adjust the padding value as needed
+									float originalCursorPosY = ImGui::GetCursorPosY();
+
+									ImGui::SetCursorPosY(originalCursorPosY + separatorPadding);
+									ImGui::Separator();
+
+									ImGui::SetCursorPosY(originalCursorPosY + separatorPadding + separatorPadding);
+								}
+								else {
+									if (ImGui::Selectable(chordNamesMajorMinor[k], is_selected))
+									{
+										selectedChordIndex = k;
+										mfr.chords[i].name = chordNamesMajorMinor[selectedChordIndex];
+									}
+									if (is_selected)
+									{
+										ImGui::SetItemDefaultFocus();
+									}
+								}
+							}
+							ImGui::EndCombo();
+						}
 					}
 				}
 				else {
-					if (ImGui::Combo(("##ChordCombo" + std::to_string(i)).c_str(), &selectedChordIndex, chordNamesMajor, IM_ARRAYSIZE(chordNamesMajor))) {
+					if (ImGui::Combo(("##ChordCombo" + std::to_string(i)).c_str(), &selectedChordIndex, chordNamesInterleaved, IM_ARRAYSIZE(chordNamesInterleaved))) {
 						unsavedChanges = true;
-						mfr.chords[i].name = chordNamesMajor[selectedChordIndex];
+						mfr.chords[i].name = chordNamesInterleaved[selectedChordIndex];
 					}
 				}
 				
@@ -2116,7 +2167,6 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 	if (ImGui::Button("Clear Chords")) {
 		ImGui::OpenPopup("Clear Chords?");
 	}
-
 	if (ImGui::BeginPopupModal("Clear Chords?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::BeginChild("Text", ImVec2(420, 69));
@@ -3029,11 +3079,16 @@ void custom_song_creator_update(size_t width, size_t height) {
 	
 	if (ImGui::BeginPopupModal("Preferences##POPUP", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::BeginChild("Body", ImVec2(600, 69));
+		ImGui::BeginChild("Body", ImVec2(600, 125));
 		ImGui::Checkbox("Velocity as percentage?", &fcsc_cfg.usePercentVelocity);
 		ImGui::SameLine();
 		HelpMarker("Some DAWs use 0-100 instead of 0-127 for velocity, check this to use 0-100 for velocity values");
 		ImGui::InputText("Default Short Name", &fcsc_cfg.defaultShortName, ImGuiInputTextFlags_CallbackCharFilter, ValidateShortName);
+		ImGui::SameLine();
+		HelpMarker("The default short name for customs, useful to add a prefix automatically. Will reset to the default of 'custom_song' if left blank");
+		ImGui::Checkbox("Opposite mode chords after current?", &fcsc_cfg.oppositeChordsAfterCurMode);
+		ImGui::SameLine();
+		HelpMarker("If checked, when displaying all chords, the opposite mode chords will be displayed after the current ones, instead of in number order");
 		ImGui::EndChild();
 		ImGui::BeginChild("Buttons", ImVec2(600, 25));
 		if (ImGui::Button("OK", ImVec2(200, 0)))
