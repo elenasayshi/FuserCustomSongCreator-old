@@ -10,6 +10,7 @@ struct ConfigFile {
     std::wstring path;
     bool usePercentVelocity = false;
     bool oppositeChordsAfterCurMode = true;
+    bool swapBorrowedChords = false;
     std::string defaultShortName = "custom_song";
     void saveConfig(const std::wstring& configFile) {
         std::ofstream outFile(configFile, std::ios_base::binary);
@@ -20,6 +21,8 @@ struct ConfigFile {
         outFile.write("\x00",1);
         outFile.write("oppositeChordsAfterCurMode\x00", 27);
         outFile.write(oppositeChordsAfterCurMode ? "1\x00" : "0\x00", 2);
+        outFile.write("swapBorrowedChords\x00", 27);
+        outFile.write(swapBorrowedChords ? "1\x00" : "0\x00", 2);
         outFile.close();
     }
     void loadConfig(const std::wstring& configFile) {
@@ -42,19 +45,23 @@ struct ConfigFile {
                                     usePercentVelocity = false;
                                 else
                                     usePercentVelocity = true;
-                                curRead = "NONE";
                             }
                             else if (curRead == "defaultShortName") {
                                 defaultShortName = value;
-                                curRead = "NONE";
                             }
                             else if (curRead == "oppositeChordsAfterCurMode") {
                                 if (value == "0")
                                     oppositeChordsAfterCurMode = false;
                                 else
                                     oppositeChordsAfterCurMode = true;
-                                curRead = "NONE";
                             }
+                            else if (curRead == "swapBorrowedChords") {
+                                if (value == "0")
+                                    swapBorrowedChords = false;
+                                else
+                                    swapBorrowedChords = true;
+                            }
+                            curRead = "NONE";
                         }
 
                         // Clear the string for the next value

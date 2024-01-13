@@ -1359,38 +1359,94 @@ const char* chordNamesMajorMinor[] = { "1", "2m", "3m", "4", "5", "6m", "sep", "
 const char* chordNamesInterleaved[] = { "1", "1m", "2m", "2mb5", "3m", "b3", "4", "4m", "5", "5m", "6m", "b6", "b7", "b2" };
 std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> convertChordsMode(std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> chords, bool minor) {
 	for (auto& chd : chords) {
-		if (chd.name == "1")
-			chd.name = "1m";
-		else if (chd.name == "1m")
-			chd.name = "1";
-		else if (chd.name == "2m")
-			chd.name = "2mb5";
-		else if (chd.name == "2mb5")
-			chd.name = "2m";
-		else if (chd.name == "3m")
-			chd.name = "b3";
-		else if (chd.name == "b3")
-			chd.name = "3m";
-		else if (chd.name == "4")
-			chd.name = "4m";
-		else if (chd.name == "4m")
-			chd.name = "4";
-		else if (chd.name == "5m" || chd.name == "b7")
-			chd.name = "5";
-		else if (chd.name == "5")
-			chd.name = "5m";
-		else if (chd.name == "b6")
-			chd.name = "6m";
-		else if (chd.name == "6m")
-			chd.name = "b6";
-		else {
-			if (chd.name != "b2") {
-				if (minor)
-					chd.name = "1m";
-				else
-					chd.name = "1";
+		if (fcsc_cfg.swapBorrowedChords) {
+			if (chd.name == "1")
+				chd.name = "1m";
+			else if (chd.name == "1m")
+				chd.name = "1";
+			else if (chd.name == "2m")
+				chd.name = "2mb5";
+			else if (chd.name == "2mb5")
+				chd.name = "2m";
+			else if (chd.name == "3m")
+				chd.name = "b3";
+			else if (chd.name == "b3")
+				chd.name = "3m";
+			else if (chd.name == "4")
+				chd.name = "4m";
+			else if (chd.name == "4m")
+				chd.name = "4";
+			else if (chd.name == "5m" || chd.name == "b7")
+				chd.name = "5";
+			else if (chd.name == "5")
+				chd.name = "5m";
+			else if (chd.name == "b6")
+				chd.name = "6m";
+			else if (chd.name == "6m")
+				chd.name = "b6";
+			else {
+				if (chd.name != "b2") {
+					if (minor)
+						chd.name = "1m";
+					else
+						chd.name = "1";
+				}
 			}
 		}
+		else {
+			if (minor) {
+				if (chd.name == "1")
+					chd.name = "1m";
+				else if (chd.name == "2m")
+					chd.name = "2mb5";
+				else if (chd.name == "3m")
+					chd.name = "b3";
+				else if (chd.name == "4")
+					chd.name = "4m";
+				else if (chd.name == "5")
+					chd.name = "5m";
+				else if (chd.name == "6m")
+					chd.name = "b6";
+				else {
+					if (chd.name != "1m" &&
+						chd.name != "2mb5" &&
+						chd.name != "b3" &&
+						chd.name != "4m" &&
+						chd.name != "5m" &&
+						chd.name != "b6" &&
+						chd.name != "b7" &&
+						chd.name != "b2") {
+						chd.name = "1m";
+					}
+				}
+			}
+			else {
+				if (chd.name == "1m")
+					chd.name = "1";
+				else if (chd.name == "2mb5")
+					chd.name = "2m";
+				else if (chd.name == "b3")
+					chd.name = "3m";
+				else if (chd.name == "4m")
+					chd.name = "4";
+				else if (chd.name == "5m" || chd.name == "b7")
+					chd.name = "5";
+				else if (chd.name == "b6")
+					chd.name = "6m";
+				else {
+					if (chd.name != "1" &&
+						chd.name != "2m" &&
+						chd.name != "3m" &&
+						chd.name != "4" &&
+						chd.name != "5" &&
+						chd.name != "6m" &&
+						chd.name != "b2") {
+						chd.name = "1";
+					}
+				}
+			}
+		}
+		
 	}
 	return chords;
 }
@@ -1997,7 +2053,8 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 							{
 								
 								bool is_selected = (selectedChordIndex == k);
-								if (chordNamesMinorMajor[k] == "sep") {
+								//used to work checking if the value at the current index is "sep" but it stopped working for some reason?????? so hardcoding the values
+								if (k==7 || k==14) {
 									float separatorPadding = 2.0f; // Adjust the padding value as needed
 									float originalCursorPosY = ImGui::GetCursorPosY();
 
@@ -2027,7 +2084,7 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 							{
 
 								bool is_selected = (selectedChordIndex == k);
-								if (chordNamesMajorMinor[k] == "sep") {
+								if (k==6 || k==14) {
 									float separatorPadding = 2.0f; // Adjust the padding value as needed
 									float originalCursorPosY = ImGui::GetCursorPosY();
 
@@ -3089,6 +3146,9 @@ void custom_song_creator_update(size_t width, size_t height) {
 		ImGui::Checkbox("Opposite mode chords after current?", &fcsc_cfg.oppositeChordsAfterCurMode);
 		ImGui::SameLine();
 		HelpMarker("If checked, when displaying all chords, the opposite mode chords will be displayed after the current ones, instead of in number order");
+		ImGui::Checkbox("Swap borrowed chords when copying?", &fcsc_cfg.swapBorrowedChords);
+		ImGui::SameLine();
+		HelpMarker("If checked, when copying chords from one mode to the other, chords borrowed from the opposite mode will be swapped as well.");
 		ImGui::EndChild();
 		ImGui::BeginChild("Buttons", ImVec2(600, 25));
 		if (ImGui::Button("OK", ImVec2(200, 0)))
