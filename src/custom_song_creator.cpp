@@ -537,6 +537,45 @@ void load_template() {
 	dataBuf.size = sizeof(custom_song_pak_template);
 	load_file(std::move(dataBuf));
 	gCtx.currentPak.get()->root.shortName = fcsc_cfg.defaultShortName;
+	int celIdx = 0;
+	for (auto& cel : gCtx.currentPak.get()->root.celData) {
+		auto&& fusionFile = cel.data.majorAssets[0].data.fusionFile.data;
+		auto&& fusionFileRiser = cel.data.songTransitionFile.data.majorAssets[0].data.fusionFile.data;
+		auto&& asset = std::get<HmxAssetFile>(fusionFile.file.e->getData().data.catagoryValues[0].value);
+		auto&& assetRiser = std::get<HmxAssetFile>(fusionFileRiser.file.e->getData().data.catagoryValues[0].value);
+
+		HmxAudio::PackageFile* fusionPackageFile = nullptr;
+		HmxAudio::PackageFile* fusionPackageFileRiser = nullptr;
+		for (auto&& file : asset.audio.audioFiles) {
+			if (file.fileType == "FusionPatchResource") {
+				fusionPackageFile = &file;
+			}
+		}
+		for (auto&& file : assetRiser.audio.audioFiles) {
+			if (file.fileType == "FusionPatchResource") {
+				fusionPackageFileRiser = &file;
+			}
+		}
+		auto&& fusion = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionPackageFile->resourceHeader);
+		auto&& fusionRiser = std::get<HmxAudio::PackageFile::FusionFileResource>(fusionPackageFileRiser->resourceHeader);
+		float newGain = fcsc_cfg.DG0;
+		float newGainRiser = fcsc_cfg.RG0;
+		if (celIdx == 1) {
+			newGain = fcsc_cfg.DG1;
+			newGainRiser = fcsc_cfg.RG1;
+		}
+		else if (celIdx == 2) {
+			newGain = fcsc_cfg.DG2;
+			newGainRiser = fcsc_cfg.RG2;
+		}
+		else if (celIdx == 3) {
+			newGain = fcsc_cfg.DG3;
+			newGainRiser = fcsc_cfg.RG3;
+		}
+		std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getFloat("volume")=newGain;
+		std::get<hmx_fusion_nodes*>(fusionRiser.nodes.getNode("presets").children[0].value)->getFloat("volume") = newGainRiser;
+		celIdx++;
+	}
 }
 
 void write_sig(DataBuffer outBuf, std::string outPath) {
@@ -3136,7 +3175,7 @@ void custom_song_creator_update(size_t width, size_t height) {
 	
 	if (ImGui::BeginPopupModal("Preferences##POPUP", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		ImGui::BeginChild("Body", ImVec2(600, 125));
+		ImGui::BeginChild("Body", ImVec2(600, 250));
 		ImGui::Checkbox("Velocity as percentage?", &fcsc_cfg.usePercentVelocity);
 		ImGui::SameLine();
 		HelpMarker("Some DAWs use 0-100 instead of 0-127 for velocity, check this to use 0-100 for velocity values");
@@ -3149,6 +3188,27 @@ void custom_song_creator_update(size_t width, size_t height) {
 		ImGui::Checkbox("Swap borrowed chords when copying?", &fcsc_cfg.swapBorrowedChords);
 		ImGui::SameLine();
 		HelpMarker("If checked, when copying chords from one mode to the other, chords borrowed from the opposite mode will be swapped as well.");
+		ImGui::Text("Disc default gain values:");
+
+		ImGui::PushItemWidth(125);
+		ImGui::InputFloat("##BeatDiscGain", &fcsc_cfg.DG0, 0.0f, 0.0f, "%.2f"); 
+		ImGui::SameLine();
+		ImGui::InputFloat("##BassDiscGain", &fcsc_cfg.DG1, 0.0f, 0.0f, "%.2f"); 
+		ImGui::SameLine();
+		ImGui::InputFloat("##LoopDiscGain", &fcsc_cfg.DG2, 0.0f, 0.0f, "%.2f"); 
+		ImGui::SameLine();
+		ImGui::InputFloat("##LeadDiscGain", &fcsc_cfg.DG3, 0.0f, 0.0f, "%.2f"); 
+		ImGui::PopItemWidth();
+		ImGui::Text("Riser default gain values:"); 
+		ImGui::PushItemWidth(125);
+		ImGui::InputFloat("##BeatRiserGain", &fcsc_cfg.RG0, 0.0f, 0.0f, "%.2f");
+		ImGui::SameLine();
+		ImGui::InputFloat("##BassRiserGain", &fcsc_cfg.RG1, 0.0f, 0.0f, "%.2f");
+		ImGui::SameLine();
+		ImGui::InputFloat("##LoopRiserGain", &fcsc_cfg.RG2, 0.0f, 0.0f, "%.2f");
+		ImGui::SameLine();
+		ImGui::InputFloat("##LeadRiserGain", &fcsc_cfg.RG3, 0.0f, 0.0f, "%.2f");
+		ImGui::PopItemWidth();
 		ImGui::EndChild();
 		ImGui::BeginChild("Buttons", ImVec2(600, 25));
 		if (ImGui::Button("OK", ImVec2(200, 0)))
