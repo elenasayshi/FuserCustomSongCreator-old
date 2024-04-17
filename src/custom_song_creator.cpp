@@ -849,6 +849,7 @@ void display_mogg_settings(FusionFileAsset& fusionFile, size_t idx, HmxAudio::Pa
 	ErrorModal("Ogg loading error", ("Failed to load ogg file:" + lastMoggError).c_str());
 }
 bool editAllMidiNote = false;
+
 void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::PackageFile*> moggFiles, hmx_fusion_nodes* audioLabels) {
 	int itemWidth = 300;
 	ImGui::PushItemWidth(itemWidth);
@@ -866,7 +867,13 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 
 
 	auto&& ts = keyzone->getNode("timestretch_settings");
-
+	if (ts.getChild("orig_tempo_sync") == nullptr) {
+		hmx_fusion_node label;
+		label.key = "orig_tempo_sync";
+		label.value = 1;
+		ts.children.insert(ts.children.begin(), label);
+	}
+	bool orig_tempo_sync = ts.getInt("orig_tempo_sync") == 1;
 	bool natp = ts.getInt("maintain_formant") == 1;
 	bool natp_changed = ImGui::Checkbox("Natural Pitching", &natp);
 	if (natp_changed) {
@@ -1007,6 +1014,24 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 
 		ImGui::TextWrapped("For audio to sync properly if it's meant to sync to the tempo and play on multiple notes, both Maintain Time and Sync Tempo have to be enabled.");
 
+		bool ots_changed = ImGui::Checkbox("Sync orig_tempo to song tempo", &orig_tempo_sync);
+		ImGui::SameLine();
+		HelpMarker("If unchecked, will allow changing orig_tempo to a different value than the song's bpm, and the game will timestretch accordingly");
+		if (ots_changed) {
+			unsavedChanges = true;
+			if (orig_tempo_sync) {
+				ts.getInt("orig_tempo_sync") = 1;
+			}
+			else {
+				ts.getInt("orig_tempo_sync") = 0;
+			}
+		}
+		if (!orig_tempo_sync) {
+			if (ImGui::InputScalar("Original Tempo", ImGuiDataType_U32, &ts.getInt("orig_tempo"))) {
+				unsavedChanges = true;
+			}
+		}
+
 		bool vel2vol = keyzone->getInt("velocity_to_volume") == 1;
 		bool vel2vol_changed = ImGui::Checkbox("Velocity to Volume", &vel2vol);
 		if (vel2vol_changed) {
@@ -1018,22 +1043,23 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		}
 		ImGui::SameLine();
 		HelpMarker("If checked, the midi note velocity will control the volume of the sample");
+
 		float& kzvol = keyzone->getFloat("volume");
 		ImGui::PushItemWidth(150);
-		if(ImGui::InputFloat("Volume", &kzvol, 0.0f, 0.0f, "%.2f"))
+		if (ImGui::InputFloat("Volume", &kzvol, 0.0f, 0.0f, "%.2f"))
 			unsavedChanges = true;
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 		HelpMarker("The volume of the keyzone. 0 means it's the same volume as the imported audio, negative values make it quieter, positive values make it louder. This is relative to the gain for the disc/riser.");
-
 		ImGui::SameLine();
+
 		float& kzpan = keyzone->getNode("pan").getFloat("position");
 		if (kzpan < -1)
 			kzpan = -1;
 		else if (kzpan > 1)
 			kzpan = 1;
 		ImGui::PushItemWidth(150);
-		if(ImGui::InputFloat("Pan", &kzpan, 0.0f, 0.0f, "%.2f"))
+		if (ImGui::InputFloat("Pan", &kzpan, 0.0f, 0.0f, "%.2f"))
 			unsavedChanges = true;
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
@@ -1092,7 +1118,6 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 				keyzone->getInt("min_velocity") = std::ceil(std::clamp(minvel, 0, 100) * 1.27);
 			else
 				keyzone->getInt("min_velocity") = std::clamp(minvel, 0, 127);
-			
 		}
 		ImGui::SameLine();
 		HelpMarker("The lowest midi note velocity at which the selected sample will play.");
@@ -1126,14 +1151,16 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		}
 		ImGui::SameLine();
 		HelpMarker("The offset, in samples, that the audio will stop playing at.");
+
 		ImGui::PopItemWidth();
 	}
-
 }
+
 bool midi_error = false;
 std::string mfrError;
 std::string last_import_midi;
-void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio::PackageFile*& fusionPackageFile, std::vector<HmxAudio::PackageFile*>& moggFiles, bool disc_advanced, int disc_midi_maj_single, int disc_midi_min_single, bool isRiser = false)
+
+static void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio::PackageFile*& fusionPackageFile, std::vector<HmxAudio::PackageFile*>& moggFiles, bool disc_advanced, int disc_midi_maj_single, int disc_midi_min_single, bool isRiser = false)
 {
 	ImVec2 btnHolderSize = ImVec2(ImGui::GetContentRegionAvail().x / 2, 30);
 	ImVec2 btnHolderSizeWarn = btnHolderSize;
@@ -1164,11 +1191,11 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 			unsavedChanges = true;
 			for (auto&& f : asset.audio.audioFiles) {
 				if (f.fileType == "FusionPatchResource") {
-
 					std::ifstream infile(*file, std::ios_base::binary);
 					std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
 					std::get<HmxAudio::PackageFile::FusionFileResource>(f.resourceHeader).nodes = hmx_fusion_parser::parseData(fileData);
-
+					if (std::get<HmxAudio::PackageFile::FusionFileResource>(f.resourceHeader).nodes.getNode("keymap").children.size() > 2)
+						disc_advanced = true;
 					break;
 				}
 			}
@@ -1393,10 +1420,12 @@ void display_fusionmidisettings(HmxAssetFile& asset, CelData& celData, HmxAudio:
 	}
 	
 }
+
 const char* chordNamesMinorMajor[] = { "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "sep", "1", "2m", "3m", "4", "5", "6m", "sep", "b2" };
 const char* chordNamesMajorMinor[] = { "1", "2m", "3m", "4", "5", "6m", "sep", "1m", "2mb5", "b3", "4m", "5m", "b6", "b7", "sep", "b2" };
 const char* chordNamesInterleaved[] = { "1", "1m", "2m", "2mb5", "3m", "b3", "4", "4m", "5", "5m", "6m", "b6", "b7", "b2" };
-std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> convertChordsMode(std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> chords, bool minor) {
+
+static std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> convertChordsMode(std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> chords, bool minor) {
 	for (auto& chd : chords) {
 		if (fcsc_cfg.swapBorrowedChords) {
 			if (chd.name == "1")
@@ -1490,7 +1519,7 @@ std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> convertChordsMode(st
 	return chords;
 }
 
-void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vector<HmxAudio::PackageFile*>& moggFiles, FusionFileAsset& fusionFile, HmxAudio::PackageFile* fusionPackageFile, bool duplicate_moggs, bool isRiser = false)
+static void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vector<HmxAudio::PackageFile*>& moggFiles, FusionFileAsset& fusionFile, HmxAudio::PackageFile* fusionPackageFile, bool duplicate_moggs, bool isRiser = false)
 {
 	if (isRiser)
 		curCelTabOffset = 1;
@@ -1703,8 +1732,6 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 	}
 
 
-
-
 	if (advanced) {
 		bool addAudio = false;
 		bool removeAudio = false;
@@ -1724,8 +1751,15 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 				if (ImGui::Selectable((std::to_string(i)).c_str(), currentAudioFile == i, ImGuiSelectableFlags_SpanAllColumns)) {
 					currentAudioFile = i;
 				}
-				ImGui::TableNextColumn();
+				ImGui::TableNextColumn(); 
+				if (audiolabels.getChild(moggName(moggFiles[i]->fileName)) == nullptr) {
+					hmx_fusion_node label;
+					label.key = moggName(moggFiles[i]->fileName);
+					label.value = moggName(moggFiles[i]->fileName);
+					audiolabels.children.push_back(label);
+				}
 				ImGui::Text(audiolabels.getString(moggName(moggFiles[i]->fileName)).c_str());
+
 			}
 			ImGui::EndTable();
 		}
@@ -1743,6 +1777,7 @@ void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vecto
 		ImGui::SameLine();
 
 		ImGui::BeginChild("AudioSettings", ImVec2((aRegion.x / 3) * 2, (aRegion.y / 3)));
+		
 		if(ImGui::InputText("Audio File Label", &audiolabels.getString(moggName(moggFiles[currentAudioFile]->fileName))))
 			unsavedChanges = true;
 		ImGui::Checkbox("Replace label on .ogg load", &replaceAudioLabel);
@@ -2011,11 +2046,12 @@ int lastChordsTab = 0;
 bool copiedChordsMinor = false;
 std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> chordCopyBuffer;
 std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> chordCopyBufferOppositeMode;
-bool compareChords(HmxAudio::PackageFile::MidiFileResource::Chord& chord1, HmxAudio::PackageFile::MidiFileResource::Chord& chord2) {
+
+static bool compareChords(HmxAudio::PackageFile::MidiFileResource::Chord& chord1, HmxAudio::PackageFile::MidiFileResource::Chord& chord2) {
 	return chord1.start < chord2.start;
 }
 
-void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSize, bool minor = false)
+static void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSize, bool minor = false)
 {
 	if (minor)
 		chordsTab = 1;
@@ -2319,7 +2355,7 @@ void display_chord_edit(CelData& celData, ImVec2& windowSize, float oggWindowSiz
 
 }
 
-void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMode) {
+static void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMode) {
 	int disc_midi_maj_single;
 	int disc_midi_min_single; 
 	{
@@ -2770,11 +2806,10 @@ void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value currentKeyMod
 	
 }
 
-
 void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice) {
 	gCtx.g_pd3dDevice = g_pd3dDevice;
-
 }
+
 std::string windowTitle = " No Song Loaded";
 void custom_song_creator_update(size_t width, size_t height) {
 	bool do_open = false;

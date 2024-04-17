@@ -617,7 +617,19 @@ struct FusionFileAsset {
 				nodes->getString("sample_path") = "C:/" + ctx.subCelName() + key + ".mogg";
 
 				auto&& ts = nodes->getNode("timestretch_settings");
-				ts.getInt("orig_tempo") = ctx.bpm;
+				if (ts.getChild("orig_tempo_sync") == nullptr) {
+					hmx_fusion_node label;
+					label.key = "orig_tempo_sync";
+					label.value = 1;
+					ts.children.insert(ts.children.begin(), label);
+					ts.getInt("orig_tempo") = ctx.bpm;
+				}
+				else {
+					if (ts.getInt("orig_tempo_sync") == 1) {
+						ts.getInt("orig_tempo") = ctx.bpm;
+					}
+				}
+				
 			}
 		}
 	}
