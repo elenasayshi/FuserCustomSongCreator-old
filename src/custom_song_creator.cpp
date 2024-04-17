@@ -850,7 +850,144 @@ void display_mogg_settings(FusionFileAsset& fusionFile, size_t idx, HmxAudio::Pa
 }
 bool editAllMidiNote = false;
 
-void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::PackageFile*> moggFiles, hmx_fusion_nodes* audioLabels) {
+void draw_visual_keymap_rect(hmx_fusion_nodes* drawZone, ImVec2& cursorScreenPos, ImVec2 winSize, int zoneIdx)
+{
+	static bool hasCornerSelected = false;
+	static int selectedCorner = 0;
+
+	std::vector<ImVec2> corners{ ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("min_note")-0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("min_velocity") - 0.5f))),
+		ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("max_note")+0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("min_velocity") - 0.5f))),
+		ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("max_note") + 0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("max_velocity")+0.5f))),
+		ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("min_note") - 0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("max_velocity") + 0.5f)))};
+	ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
+		ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("min_note") - 0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("min_velocity") - 0.5f))),
+		ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("max_note") + 0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("max_velocity") + 0.5f))),
+		IM_COL32(255, 127, 0, zoneIdx == currentKeyzone ? 90 : 60)
+	);
+	if(zoneIdx == currentKeyzone){
+		ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
+			ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("min_note") - 0.5f), cursorScreenPos.y + (winSize.y / 127) * (127.5f)),
+			ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("max_note") + 0.5f), cursorScreenPos.y + winSize.y + 32),
+			IM_COL32(0, 0, 255, 100)
+		);
+		ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
+			ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("root_note") - 0.5f), cursorScreenPos.y + winSize.y+32),
+			ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("root_note") + 0.5f), cursorScreenPos.y + (winSize.y / 127) * (-0.5f)),
+			IM_COL32(255, 0, 0, 100)
+		);
+	}
+	ImGui::GetCurrentWindow()->DrawList->AddRect(
+		ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("min_note")-0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("min_velocity") - 0.5f))),
+		ImVec2(cursorScreenPos.x + (winSize.x / 127) * (drawZone->getInt("max_note") + 0.5f), cursorScreenPos.y + (winSize.y / 127) * (127 - (drawZone->getInt("max_velocity") + 0.5f))),
+		IM_COL32(255, 127, 0, 255)
+	);
+	for (int i = 0; i < 4; i++) {
+		if (zoneIdx == currentKeyzone) {
+			if (hasCornerSelected && selectedCorner == i) {
+				ImVec2 mousePos = ImGui::GetMousePos();
+				int noteVal = std::clamp(((mousePos.x - (cursorScreenPos.x)) / winSize.x) * 127, 0.0f, 127.0f);
+				int velocityVal = std::clamp(127 - ((mousePos.y - (cursorScreenPos.y)) / winSize.y)*127, 0.0f, 127.0f);
+				
+				switch (selectedCorner) {
+				case 0:
+					if (noteVal <= drawZone->getInt("max_note")) drawZone->getInt("min_note") = noteVal;
+					if (velocityVal <= drawZone->getInt("max_velocity")) drawZone->getInt("min_velocity") = velocityVal;
+					ImGui::BeginTooltip();
+					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("min_note"))).c_str());
+					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("min_velocity"))).c_str());
+					ImGui::EndTooltip();
+					break;
+				case 1:
+					if (noteVal >= drawZone->getInt("min_note")) drawZone->getInt("max_note") = noteVal;
+					if (velocityVal <= drawZone->getInt("max_velocity")) drawZone->getInt("min_velocity") = velocityVal;
+					ImGui::BeginTooltip();
+					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("max_note"))).c_str());
+					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("min_velocity"))).c_str());
+					ImGui::EndTooltip();
+					break;
+				case 2:
+					if (noteVal >= drawZone->getInt("min_note")) drawZone->getInt("max_note") = noteVal;
+					if (velocityVal >= drawZone->getInt("min_velocity")) drawZone->getInt("max_velocity") = velocityVal;
+					ImGui::BeginTooltip();
+					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("max_note"))).c_str());
+					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("max_velocity"))).c_str());
+					ImGui::EndTooltip();
+					break;
+				case 3:
+					if (noteVal <= drawZone->getInt("max_note")) drawZone->getInt("min_note") = noteVal;
+					if (velocityVal >= drawZone->getInt("min_velocity")) drawZone->getInt("max_velocity") = velocityVal;
+					ImGui::BeginTooltip();
+					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("min_note"))).c_str());
+					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("max_velocity"))).c_str());
+					ImGui::EndTooltip();
+					break;
+				}
+			}
+			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+				hasCornerSelected = false;
+			}
+			if ((hasCornerSelected && selectedCorner==i) || ImGui::IsMouseHoveringRect(ImVec2(corners[i].x - 5, corners[i].y - 5), ImVec2(corners[i].x + 5, corners[i].y + 5)))
+			{	
+				if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !hasCornerSelected) {
+					hasCornerSelected = true;
+					selectedCorner = i;
+				}
+				ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
+					ImVec2(corners[i].x - 5, corners[i].y - 5),
+					ImVec2(corners[i].x + 5, corners[i].y + 5),
+					IM_COL32(255, 255, 127, 255)
+				);
+			}
+			else
+			{
+				ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
+					ImVec2(corners[i].x - 5, corners[i].y - 5),
+					ImVec2(corners[i].x + 5, corners[i].y + 5),
+					IM_COL32(255, 127, 0, 255)
+				);
+			}
+		}
+	}
+}
+
+
+void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::PackageFile*> moggFiles, hmx_fusion_nodes* audioLabels, hmx_fusion_nodes* map) {
+	static bool keyzoneVisualEdit = false;
+
+	if (keyzoneVisualEdit) {
+		ImGui::SetNextWindowSize(ImVec2(512, 266+32), ImGuiCond_FirstUseEver);
+		ImVec2 dragDelta = ImVec2(0, 0);
+		static bool isDragging = false;
+		ImGui::Begin("Visual Keyzone Editor##VKZWIN", &keyzoneVisualEdit);
+		ImVec2 winSize = ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
+		ImGui::BeginChild("##RectDraw", winSize);
+		winSize = ImVec2(ImGui::GetContentRegionAvail().x - 20, ImGui::GetContentRegionAvail().y - 52);
+		ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
+		cursorScreenPos.x += 10;
+		cursorScreenPos.y += 10;
+		for (int i = 0; i < 128; i++) {
+			bool sharp = false;
+			int octKey = i % 12;
+			if (octKey == 1 || octKey == 3 || octKey == 6 || octKey == 8 || octKey == 10) sharp = true;
+			ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
+				ImVec2(cursorScreenPos.x + (winSize.x / 127) * (i - 0.5f), cursorScreenPos.y+(winSize.y / 127) * (127.5f)),
+				ImVec2(cursorScreenPos.x + (winSize.x / 127) * (i + 0.5f), cursorScreenPos.y + winSize.y + 32),
+				sharp ? IM_COL32(0, 0, 0, 255) : IM_COL32(255, 255, 255, 255)
+			);
+		}
+		int zoneIdx = 0;
+		for (auto& zone : map->children) {
+			if (zoneIdx != currentKeyzone) {
+				hmx_fusion_nodes* drawZone = std::get<hmx_fusion_nodes*>(zone.value);
+				draw_visual_keymap_rect(drawZone, cursorScreenPos, winSize, zoneIdx);
+			}
+			zoneIdx++;
+		}
+		draw_visual_keymap_rect(keyzone, cursorScreenPos, winSize, currentKeyzone);
+		ImGui::EndChild();
+		ImGui::End();
+	}
+	
 	int itemWidth = 300;
 	ImGui::PushItemWidth(itemWidth);
 	if(ImGui::InputText("Keymap Label", &keyzone->getString("zone_label")))
@@ -1064,7 +1201,8 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 		HelpMarker("Panning of the keyzone. -1 is left, 1 is right, 0 is center");
-
+		if(ImGui::Button("Open visual keyzone editor##VKZButton"))
+			keyzoneVisualEdit=true;
 		ImGui::Checkbox("Link MIDI Notes", &editAllMidiNote);
 		ImGui::SameLine();
 		HelpMarker("If checked, changing one midi note value will change all 3. Useful for drums.");
@@ -1155,6 +1293,8 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 		ImGui::PopItemWidth();
 	}
 }
+
+
 
 bool midi_error = false;
 std::string mfrError;
@@ -1864,7 +2004,7 @@ static void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std
 		ImGui::SameLine();
 
 		ImGui::BeginChild("KeymapSettings", ImVec2((aRegion.x / 3) * 2, ImGui::GetContentRegionAvail().y));
-		display_keyzone_settings(std::get<hmx_fusion_nodes*>(map.children[currentKeyzone].value), moggFiles, &audiolabels);
+		display_keyzone_settings(std::get<hmx_fusion_nodes*>(map.children[currentKeyzone].value), moggFiles, &audiolabels, &map);
 		ImGui::EndChild();
 
 		ImGui::EndChild();
@@ -2850,14 +2990,15 @@ void custom_song_creator_update(size_t width, size_t height) {
 
 	ImGui::SetNextWindowPos(ImVec2{ 0, 0 });
 	ImGui::SetNextWindowSize(ImVec2{ (float)width, (float)height });
-
+	
 	ImGuiWindowFlags window_flags = 0;
 	window_flags |= ImGuiWindowFlags_NoMove;
 	window_flags |= ImGuiWindowFlags_NoResize;
 	window_flags |= ImGuiWindowFlags_NoCollapse;
 	window_flags |= ImGuiWindowFlags_MenuBar;
+	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	ImGui::Begin((windowTitle+"###FCSC_TITLE").c_str(), nullptr, window_flags);
+	ImGui::Begin((windowTitle+"###FCSC_TITLE").c_str(), nullptr, window_flags); 
 	if (ImGui::BeginMenuBar())
 	{
 		if (ImGui::BeginMenu("File"))
