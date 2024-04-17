@@ -1519,6 +1519,8 @@ static std::vector<HmxAudio::PackageFile::MidiFileResource::Chord> convertChords
 	return chords;
 }
 
+std::vector<std::string> layer_select_modes = {"layers","random","random_with_repetition","cycle"};
+
 static void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std::vector<HmxAudio::PackageFile*>& moggFiles, FusionFileAsset& fusionFile, HmxAudio::PackageFile* fusionPackageFile, bool duplicate_moggs, bool isRiser = false)
 {
 	if (isRiser)
@@ -1590,6 +1592,31 @@ static void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std
 	ImGui::SameLine();
 
 	HelpMarker(gainHelpString.c_str());
+	ImGui::SameLine();
+	ImGui::PushItemWidth(150);
+	std::string &layerMode = std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getString("layer_select_mode");
+	if (std::find(layer_select_modes.begin(), layer_select_modes.end(), layerMode) == layer_select_modes.end()) 
+		layerMode = "layers";
+	if (advanced) {
+		if (ImGui::BeginCombo("Layering Mode", layerMode.c_str())) {
+			for (int i = 0; i < layer_select_modes.size(); ++i)
+			{
+				bool is_selected = layerMode == layer_select_modes[i];
+				if (ImGui::Selectable(layer_select_modes[i].c_str(), is_selected))
+				{
+					std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getString("layer_select_mode") = layer_select_modes[i];
+				}
+				if (is_selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		HelpMarker("Layering mode determines how the keyzones will be played. The modes are as follows:\nLayers - Any overlapping keyzones will play at the same time\nRandom - Randomly select a keyzone from any on the same note and velocity\nRandom with repetition: Same as Random, but the last played keyzone can repeat\nCycle: Will play the keyzones on the same note in a cyling pattern.");
+	}
 	if (ImGui::BeginPopupModal("Switch Modes?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
 		ImGui::BeginChild("PopupHolder", ImVec2(420, 120));
@@ -2418,15 +2445,18 @@ static void display_cel_data(CelData& celData, FuserEnums::KeyMode::Value curren
 			if (nodes->getChild("zone_label") == nullptr) {
 				hmx_fusion_node label;
 				label.key = "zone_label";
-				if (mapidx == 0) {
-					label.value = "Major";
+				if (!disc_advanced) {
+					if (mapidx == 0) {
+						label.value = "Major";
+					}
+					else if (mapidx == 1) {
+						label.value = "Minor";
+					}
+					else {
+						label.value = "UNKNOWN";
+					}
 				}
-				else if (mapidx == 1) {
-					label.value = "Minor";
-				}
-				else {
-					label.value = "UNKNOWN";
-				}
+				else { label.value = "Keyzone " + std::to_string(mapidx); }
 				nodes->children.insert(nodes->children.begin(), label);
 			}
 			if (nodes->getChild("keymap_preset") == nullptr) {
