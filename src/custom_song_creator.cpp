@@ -68,8 +68,12 @@ struct AudioCtx {
 	float volume;
 };
 AudioCtx gAudio;
-extern bool unsavedChanges;
+bool unsavedChanges = false;
 bool closePressed = false;
+bool filenameArg = false;
+std::string filenameArgPath;
+
+
 void initAudio() {
 	if (gAudio.init) {
 		BASS_Free();
@@ -2999,6 +3003,17 @@ void custom_song_creator_update(size_t width, size_t height) {
 	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 	ImGui::Begin((windowTitle+"###FCSC_TITLE").c_str(), nullptr, window_flags); 
+	if (filenameArg) {
+		std::ifstream infile(filenameArgPath, std::ios_base::binary);
+		std::vector<u8> fileData = std::vector<u8>(std::istreambuf_iterator<char>(infile), std::istreambuf_iterator<char>());
+
+		DataBuffer dataBuf;
+		dataBuf.setupVector(fileData);
+		load_file(std::move(dataBuf));
+
+		gCtx.saveLocation = filenameArgPath;
+		filenameArg = false;
+	}
 	if (ImGui::BeginMenuBar())
 	{
 		if (ImGui::BeginMenu("File"))

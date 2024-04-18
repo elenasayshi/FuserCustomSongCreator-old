@@ -21,6 +21,7 @@
 #include "bass/bass.h"
 #include "configfile.h"
 #include <vector>
+#include <codecvt>
 
 // Data
 static ID3D11Device*            g_pd3dDevice = NULL;
@@ -42,8 +43,11 @@ size_t window_height = 800;
 extern void custom_song_creator_update(size_t width, size_t height);
 extern void set_g_pd3dDevice(ID3D11Device* g_pd3dDevice);
 extern void initAudio();
-bool unsavedChanges=false;
+extern bool unsavedChanges;
 extern bool closePressed;
+extern bool filenameArg;
+extern std::string filenameArgPath;
+
 HWND G_hwnd;
 
 
@@ -140,6 +144,23 @@ int __stdcall WinMain(
 
     // Main loop
     PWSTR appDataPath = nullptr;
+
+    LPWSTR* szArglist;
+    int nArgs;
+
+    szArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);
+    if (NULL == szArglist) {
+        return 1;
+    }
+
+    // Check if any arguments are provided
+    if (nArgs > 1) {
+        filenameArg = true;
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+        filenameArgPath = converter.to_bytes(szArglist[1]);
+    }
+
+    LocalFree(szArglist);
     if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appDataPath) == S_OK)
     {
         std::wstring appDataFolderPath(appDataPath);
