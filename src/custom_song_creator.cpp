@@ -898,7 +898,7 @@ void draw_visual_keymap_rect(hmx_fusion_nodes* drawZone, ImVec2& cursorScreenPos
 					if (velocityVal <= drawZone->getInt("max_velocity")) drawZone->getInt("min_velocity") = velocityVal;
 					ImGui::BeginTooltip();
 					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("min_note"))).c_str());
-					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("min_velocity"))).c_str());
+					ImGui::Text(std::string("Velocity " + (std::to_string(fcsc_cfg.usePercentVelocity ? (int)((drawZone->getInt("min_velocity")/127.0f)*100) : drawZone->getInt("min_velocity")))).c_str());
 					ImGui::EndTooltip();
 					break;
 				case 1:
@@ -906,7 +906,7 @@ void draw_visual_keymap_rect(hmx_fusion_nodes* drawZone, ImVec2& cursorScreenPos
 					if (velocityVal <= drawZone->getInt("max_velocity")) drawZone->getInt("min_velocity") = velocityVal;
 					ImGui::BeginTooltip();
 					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("max_note"))).c_str());
-					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("min_velocity"))).c_str());
+					ImGui::Text(std::string("Velocity " + (std::to_string(fcsc_cfg.usePercentVelocity ? (int)((drawZone->getInt("min_velocity") / 127.0f) * 100) : drawZone->getInt("min_velocity")))).c_str());
 					ImGui::EndTooltip();
 					break;
 				case 2:
@@ -914,7 +914,7 @@ void draw_visual_keymap_rect(hmx_fusion_nodes* drawZone, ImVec2& cursorScreenPos
 					if (velocityVal >= drawZone->getInt("min_velocity")) drawZone->getInt("max_velocity") = velocityVal;
 					ImGui::BeginTooltip();
 					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("max_note"))).c_str());
-					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("max_velocity"))).c_str());
+					ImGui::Text(std::string("Velocity " + (std::to_string(fcsc_cfg.usePercentVelocity ? (int)((drawZone->getInt("max_velocity") / 127.0f) * 100) : drawZone->getInt("max_velocity")))).c_str());
 					ImGui::EndTooltip();
 					break;
 				case 3:
@@ -922,7 +922,7 @@ void draw_visual_keymap_rect(hmx_fusion_nodes* drawZone, ImVec2& cursorScreenPos
 					if (velocityVal >= drawZone->getInt("min_velocity")) drawZone->getInt("max_velocity") = velocityVal;
 					ImGui::BeginTooltip();
 					ImGui::Text(std::string("Note " + std::to_string(drawZone->getInt("min_note"))).c_str());
-					ImGui::Text(std::string("Velocity " + std::to_string(drawZone->getInt("max_velocity"))).c_str());
+					ImGui::Text(std::string("Velocity " + (std::to_string(fcsc_cfg.usePercentVelocity ? (int)((drawZone->getInt("max_velocity") / 127.0f) * 100) : drawZone->getInt("max_velocity")))).c_str());
 					ImGui::EndTooltip();
 					break;
 				}
@@ -960,25 +960,98 @@ void display_keyzone_settings(hmx_fusion_nodes* keyzone, std::vector<HmxAudio::P
 
 	if (keyzoneVisualEdit) {
 		ImGui::SetNextWindowSize(ImVec2(512, 266+32), ImGuiCond_FirstUseEver);
-		ImVec2 dragDelta = ImVec2(0, 0);
-		static bool isDragging = false;
 		ImGui::Begin("Visual Keyzone Editor##VKZWIN", &keyzoneVisualEdit);
 		ImVec2 winSize = ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y);
 		ImGui::BeginChild("##RectDraw", winSize);
-		winSize = ImVec2(ImGui::GetContentRegionAvail().x - 20, ImGui::GetContentRegionAvail().y - 52);
+		winSize = ImVec2(ImGui::GetContentRegionAvail().x - 60, ImGui::GetContentRegionAvail().y - 52);
 		ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
-		cursorScreenPos.x += 10;
+		cursorScreenPos.x += 40;
 		cursorScreenPos.y += 10;
+		static bool noteClick = false;
+		static bool velClick = false;
+		static ImVec2 clickPos(0, 0);
+		static int noteValStart = 0;
+		static int velStart = 0;
+		std::vector<std::string> noteNames{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 		for (int i = 0; i < 128; i++) {
 			bool sharp = false;
 			int octKey = i % 12;
+			int oct = (i / 12)-2;
 			if (octKey == 1 || octKey == 3 || octKey == 6 || octKey == 8 || octKey == 10) sharp = true;
+			ImVec2 topLeft(cursorScreenPos.x + (winSize.x / 127) * (i - 0.5f), cursorScreenPos.y + (winSize.y / 127) * (127.5f));
+			ImVec2 bottomRight(cursorScreenPos.x + (winSize.x / 127) * (i + 0.5f), cursorScreenPos.y + winSize.y + 32);
 			ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
-				ImVec2(cursorScreenPos.x + (winSize.x / 127) * (i - 0.5f), cursorScreenPos.y+(winSize.y / 127) * (127.5f)),
-				ImVec2(cursorScreenPos.x + (winSize.x / 127) * (i + 0.5f), cursorScreenPos.y + winSize.y + 32),
+				topLeft,
+				bottomRight,
 				sharp ? IM_COL32(0, 0, 0, 255) : IM_COL32(255, 255, 255, 255)
 			);
+			if (ImGui::IsMouseHoveringRect(topLeft, bottomRight)) {
+				ImGui::BeginTooltip();
+				ImGui::Text(std::string(noteNames[octKey] + std::to_string(oct)).c_str());
+				ImGui::EndTooltip();
+				if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !noteClick && !velClick) {
+					noteClick = true;
+					clickPos = ImGui::GetMousePos();
+					noteValStart = i;
+				}
+				if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+					clickPos = ImGui::GetMousePos();
+					keyzone->getInt("root_note") = i;
+				}
+			}
 		}
+		for (int i = 0; i < 128; i++){
+			ImVec2 topLeft(cursorScreenPos.x - 40 , cursorScreenPos.y + (winSize.y / 127) * (127 - i - 0.5f));
+			ImVec2 bottomRight(cursorScreenPos.x - (winSize.x / 127) * 0.5f, cursorScreenPos.y + (winSize.y / 127) * (127 - i + 0.5f));
+			ImGui::GetCurrentWindow()->DrawList->AddRectFilled(
+				topLeft,
+				bottomRight,
+				IM_COL32(i*2, 255-(i*2), 0, 255)
+			);
+			if (ImGui::IsMouseHoveringRect(topLeft, bottomRight)) {
+				ImGui::BeginTooltip();
+				ImGui::Text(std::to_string(fcsc_cfg.usePercentVelocity? (int)((i/127.0f)*100):i).c_str());
+				ImGui::EndTooltip();
+				if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !noteClick && !velClick) {
+					velClick = true;
+					clickPos = ImGui::GetMousePos();
+					velStart = i;
+				}
+			}
+		}
+		if (noteClick) {
+			ImVec2 mousePos = ImGui::GetMousePos();
+			int noteVal = std::clamp(((mousePos.x - (cursorScreenPos.x)) / winSize.x) * 127, 0.0f, 127.0f);
+			if (noteVal >= noteValStart) {
+				keyzone->getInt("min_note") = noteValStart;
+				keyzone->getInt("max_note") = noteVal;
+			}
+			else {
+				keyzone->getInt("min_note") = noteVal;
+				keyzone->getInt("max_note") = noteValStart;
+			}
+		}
+		if (velClick) {
+			ImVec2 mousePos = ImGui::GetMousePos();
+			int velVal = std::clamp(127-((mousePos.y - (cursorScreenPos.y)) / winSize.y) * 127, 0.0f, 127.0f);
+			if (velVal >= velStart) {
+				keyzone->getInt("min_velocity") = velStart;
+				keyzone->getInt("max_velocity") = velVal;
+			}
+			else {
+				keyzone->getInt("min_velocity") = velVal;
+				keyzone->getInt("max_velocity") = velStart;
+			}
+		}
+		if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+			noteClick = false;
+			noteValStart = 0;
+			velClick = false;
+			velStart = 0;
+			clickPos = ImVec2(0, 0);
+		}
+
+		
 		int zoneIdx = 0;
 		for (auto& zone : map->children) {
 			if (zoneIdx != currentKeyzone) {
@@ -1736,12 +1809,12 @@ static void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std
 	ImGui::SameLine();
 
 	HelpMarker(gainHelpString.c_str());
-	ImGui::SameLine();
-	ImGui::PushItemWidth(150);
-	std::string &layerMode = std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getString("layer_select_mode");
-	if (std::find(layer_select_modes.begin(), layer_select_modes.end(), layerMode) == layer_select_modes.end()) 
-		layerMode = "layers";
 	if (advanced) {
+		ImGui::SameLine();
+		ImGui::PushItemWidth(150);
+		std::string& layerMode = std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getString("layer_select_mode");
+		if (std::find(layer_select_modes.begin(), layer_select_modes.end(), layerMode) == layer_select_modes.end())
+			layerMode = "layers";
 		if (ImGui::BeginCombo("Layering Mode", layerMode.c_str())) {
 			for (int i = 0; i < layer_select_modes.size(); ++i)
 			{
@@ -1869,6 +1942,7 @@ static void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std
 					celData.tickLength = 61440;
 				}
 				celData.tickLengthAdvanced = false;
+				std::get<hmx_fusion_nodes*>(fusion.nodes.getNode("presets").children[0].value)->getString("layer_select_mode") = "layers";
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("No", ImVec2(120, 0)))
@@ -2088,7 +2162,6 @@ static void display_cel_audio_options(CelData& celData, HmxAssetFile& asset, std
 					}
 				}
 			}
-
 		}
 	}
 	else {
