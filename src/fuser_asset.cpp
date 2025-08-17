@@ -11,6 +11,7 @@ namespace fs = std::filesystem;
 
 #include "custom_song_pak_template.h"
 
+#define NOMINMAX
 #include <Windows.h>
 
 #include "fuser_asset.h"
